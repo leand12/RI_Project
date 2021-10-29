@@ -1,11 +1,65 @@
 import re
 import sys
 
-PRODUCT_TITLE = 5
-REVIEW_HEADLINE = 11
-REVIEW_BODY = 12
-REVIEW_ID = 2
 
+class Indexer:
+
+    def __init__(self, save_positions=False, directory="./blocks/"):
+        self.save_positions = save_positions
+        self.index = {}
+        self.term_posting_size = {}     # keeps the number of postings of a term
+        self.dir = directory
+        self.block_cnt = 0
+
+    def write_block_disk(self):
+        # writes the current indexer block to disk
+        with open(self.dir + str(self.block_cnt) + ".txt", "w") as f:
+            
+            if self.save_positions:
+                assert False, "Not implemented"
+            else:
+
+                for term, posts in self.index:
+                    f.write(term + ' '.join(posts) + "\n")
+
+                self.term_posting_size[term] = len(self.index[term])
+                self.index = {}
+
+    def read_term_to_memory(self, term):
+        # TODO: we need to know where this term is stored
+        # maybe use an index that points to a certain letter and start read from there
+        with open("random.txt", "r") as f:
+           pass
+
+
+    def merge_block_disk(self):
+        # TODO: mapReduce should be used here somewhere
+        # merges the block files in disk
+        pass
+
+    def index_terms(self, terms, doc):
+        # indexes a list of terms provided by the tokenizer
+
+        # terms -> List[Tuple(term, pos)]
+        for term, pos in terms:
+            
+            if self.save_positions:
+                # index -> Dict[term: Dict[doc: List[pos]]]
+                self.index.setdefault(term, {doc: []}) \
+                    .setdefault(doc, []) \
+                    .append(pos)
+            else:
+                # index -> Dict[term: List[doc]]
+                self.index.setdefault(term, [])
+                self.index[term].append(doc)
+
+
+
+
+
+
+
+"""
 class Indexer:
     
     def __init__(self, save_positions=False):
@@ -50,7 +104,7 @@ class Indexer:
 
     def update_index_entry(self, term, doc_id, n=None):
         """
-        Needs the term, the id of the doc and the position of the term in the doc 
+        #Needs the term, the id of the doc and the position of the term in the doc 
         """
 
         if self.save_positions:
@@ -94,7 +148,7 @@ class Indexer:
 indexer = Indexer()
 indexer.tokenizer("data")
 
-
+"""
 
 
 """
