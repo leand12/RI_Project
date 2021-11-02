@@ -1,6 +1,6 @@
 from nltk.stem import PorterStemmer
 import os
-
+import re
 # https://towardsdatascience.com/text-normalization-7ecc8e084e31
 # https://towardsdatascience.com/text-normalization-for-natural-language-processing-nlp-70a314bfa646
 
@@ -28,24 +28,26 @@ class Tokenizer:
             return True
 
         # TODO: stopwords
-        return len(word) < 3
+        return len(token) < 3
 
     def tokenize(self, line):
         doc = line.split('\t')
         review = doc[Review.HEADLINE] + doc[Review.BODY]
         review_id = doc[Review.ID]
 
-        self.update_fields(doc)
-
+        #self.update_fields(doc)
+        terms = []
         for pos, token in enumerate(review.split()):
             term = self.normalize_token(token)
 
             if self.is_stopword(term):
                 continue
-
+            terms.append(term)
         # { token: { doc1: p1, p2} }
+        # FIXME: change the return value
+        # it is only like this to match the indexer
+        return terms, review_id
 
-
-t = Tokenizer()
+#t = Tokenizer()
 # ps_stem_sent = [ps.stem(words_sent) for words_sent in sent]
 # print(ps_stem_sent)
