@@ -5,20 +5,21 @@ import glob
 
 class Indexer:
 
-    def __init__(self, save_positions=False, directory="./block/"):
-        self.save_positions = save_positions
+    def __init__(self, positional=False, directory="./block/"):
+        self.positional = positional
         self.index = {}
         self.term_posting_size = {}     # keeps the number of postings of a term
         self.dir = directory
         self.block_cnt = 0
         self.threshold = 10000         # change this value or let it be set by the user
         self.block_threshold = 3
+        self.tokenizer = Tokenizer()
 
     def write_block_disk(self):
         # writes the current indexer block to disk
         with open(self.dir + "block" + str(self.block_cnt) + ".txt", "w+") as f:
             self.block_cnt += 1
-            if self.save_positions:
+            if self.positional:
                 assert False, "Not implemented"
             else:
                 
@@ -118,7 +119,7 @@ class Indexer:
         # FIXME: need the positions but tokenizer is not ready yet
         #for term, pos in terms:
         for term in terms:
-            if self.save_positions:
+            if self.positional:
                 # index -> Dict[term: Dict[doc: List[pos]]]
                 self.index.setdefault(term, {doc: []}) \
                     .setdefault(doc, []) \
