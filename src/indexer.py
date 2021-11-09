@@ -2,16 +2,18 @@ import re
 import sys
 import os
 import glob
+from tokenizer import Tokenizer
 
 class Indexer:
 
-    def __init__(self, save_positions=False, block_directory="./block/"):
-        self.save_positions = save_positions
+    def __init__(self, positional=False, block_directory="./block/"):
+        self.positional = positional
         self.index = {}
         self.term_posting_size = {}     # keeps the number of postings of a term
         self.block_directory = block_directory
         self.block_cnt = 0
         self.threshold = 10000         # change this value or let it be set by the user
+        self.tokenizer = Tokenizer()
 
     def write_block_disk(self):
 
@@ -21,7 +23,7 @@ class Indexer:
         # writes the current indexer block to disk
         with open(self.block_directory + "block" + str(self.block_cnt) + ".txt", "w+") as f:
             self.block_cnt += 1
-            if self.save_positions:
+            if self.positional:
                 assert False, "Not implemented"
             else:
                 
@@ -50,7 +52,7 @@ class Indexer:
 
     def merge_block_disk(self):
     
-        blocks = glob.glob(self.block_directory)
+        blocks = glob.glob(self.block_directory + "*")
         chunk_size = 1000
         threshold = 5000
         
@@ -117,8 +119,8 @@ class Indexer:
         # terms -> List[Tuple(term, pos)]
         # FIXME: need the positions but tokenizer is not ready yet
         #for term, pos in terms:
-        for term in terms:
-            if self.save_positions:
+        for term, pos in terms:
+            if self.positional:
                 # index -> Dict[term: Dict[doc: List[pos]]]
                 self.index.setdefault(term, {doc: []}) \
                     .setdefault(doc, []) \

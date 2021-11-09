@@ -1,4 +1,4 @@
-from nltk.stem import PorterStemmer
+from nltk.stem import SnowballStemmer
 import os
 import re
 # https://towardsdatascience.com/text-normalization-7ecc8e084e31
@@ -11,24 +11,33 @@ class Review:
 
 class Tokenizer:
     
-    def __init__(self, min_length=2, use_stopwords=True, use_stemmer=True):
+    def __init__(self, min_length=3, case_folding=True, no_numbers=True, stopwords=True, stemmer=True):
         self.min_length = min_length
+        self.case_folding = case_folding
+        self.no_numbers = no_numbers
         self.stopwords = {}
-        if use_stopwords:
+        self.stemmer = None
+        if stopwords:
             dirname, _ = os.path.split(os.path.abspath(__file__))
             self.stopwords = {w for w in open(dirname + "/../data/nltk_en_stopwords.txt", "r").read().split()}
-        if use_stemmer:
-            self.stemmer = PorterStemmer()
+        if stemmer:
+            self.stemmer = SnowballStemmer("english")
 
-    def normalize_token(self, word):
-        return re.sub('[^0-9a-zA-Z-_\']+', '', word.lower())
+    def normalize_tokens(self, terms):
+        # TODO: what to do with hiphens?
 
-    def is_stopword(self, token):
-        if token in self.stopwords:
-            return True
+        if self.min_length:
+            terms = [term for term in terms if len(term) >= self.min_length]
+        if self.stopwords:
+            terms = [term for term in terms if term.lower() not in self.stopwords]
+        if self.no_numbers:
+            terms = [term for term in terms if not term.replace(",", "").replace(".", "").isdigit()]
+        if self.case_folding:
+            terms = [term.casefold() for term in terms]
+        if self.stemmer:
+            terms = [self.stemmer.stem(term) for term in terms]
 
-        # TODO: stopwords
-        return len(token) < 3
+        return terms
 
     def tokenize(self, line):
         doc = line.split('\t')
@@ -37,12 +46,8 @@ class Tokenizer:
 
         #self.update_fields(doc)
         terms = []
-        for pos, token in enumerate(review.split()):
-            term = self.normalize_token(token)
-
-            if self.is_stopword(term):
-                continue
-            terms.append(term)
+        for pos, term in enumerate(self.normalize_tokens(review.split())):
+            terms.append((term, pos))
         # { token: { doc1: p1, p2} }
         # FIXME: change the return value
         # it is only like this to match the indexer
@@ -51,3 +56,5 @@ class Tokenizer:
 #t = Tokenizer()
 # ps_stem_sent = [ps.stem(words_sent) for words_sent in sent]
 # print(ps_stem_sent)
+
+
