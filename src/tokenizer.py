@@ -25,7 +25,8 @@ class Tokenizer:
 
     def normalize_tokens(self, terms):
         # TODO: what to do with hiphens?
-
+        
+        terms = [re.sub(r'[^\w\s]','',term) for term in terms]
         if self.min_length:
             terms = [term for term in terms if len(term) >= self.min_length]
         if self.stopwords:
