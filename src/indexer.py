@@ -5,33 +5,31 @@ import glob
 
 class Indexer:
 
-    def __init__(self, save_positions=False, directory="./block/"):
+    def __init__(self, save_positions=False, block_directory="./block/"):
         self.save_positions = save_positions
         self.index = {}
         self.term_posting_size = {}     # keeps the number of postings of a term
-        self.dir = directory
+        self.block_directory = block_directory
         self.block_cnt = 0
         self.threshold = 10000         # change this value or let it be set by the user
-        self.block_threshold = 3
 
     def write_block_disk(self):
+
+        if not os.path.exists(self.block_directory):
+            os.mkdir(self.block_directory)
+
         # writes the current indexer block to disk
-        with open(self.dir + "block" + str(self.block_cnt) + ".txt", "w+") as f:
+        with open(self.block_directory + "block" + str(self.block_cnt) + ".txt", "w+") as f:
             self.block_cnt += 1
             if self.save_positions:
                 assert False, "Not implemented"
             else:
                 
                 for term in sorted(self.index.keys()):
-                    for posting in self.index[term]:
-                        f.write(term + " " + str(posting) + "\n")
+                    f.write(term + " " + " ".join(self.index[term]) + "\n")
 
                 self.term_posting_size[term] = len(self.index[term])
                 self.index = {}
-
-        if self.block_cnt == self.block_threshold:
-            self.merge_block_disk()
-            self.block_cnt = 0
 
     def clear_blocks(self):
         print("Removing unused blocks")
@@ -52,7 +50,7 @@ class Indexer:
 
     def merge_block_disk(self):
     
-        blocks = glob.glob("./block/block*")
+        blocks = glob.glob(self.block_directory)
         chunk_size = 1000
         threshold = 5000
         
@@ -73,8 +71,10 @@ class Indexer:
                         remove_lst.append(i)
 
                     for doc in docs:
-                        term, doc_id = doc.strip().split(" ")
-                        terms.setdefault(term, []).append(doc_id)
+                        line = doc.strip().split(" ")
+                        term = line[0]
+                        doc_lst = line[1:]
+                        terms.setdefault(term, []).extend(doc_lst) 
                         last_terms[i] = term
 
             last_term = min(last_terms)
