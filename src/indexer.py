@@ -6,11 +6,12 @@ from tokenizer import Tokenizer
 
 class Indexer:
 
-    def __init__(self, positional=False, block_directory="./block/"):
+    def __init__(self, positional=False, block_directory="./block/", merge_directory="./indexer/"):
         self.positional = positional
         self.index = {}
         self.term_posting_size = {}     # keeps the number of postings of a term
         self.block_directory = block_directory
+        self.merge_directory = merge_directory
         self.block_cnt = 0
         self.threshold = 10000         # change this value or let it be set by the user
         self.tokenizer = Tokenizer()
@@ -29,9 +30,29 @@ class Indexer:
                 
                 for term in sorted(self.index.keys()):
                     f.write(term + " " + " ".join(self.index[term]) + "\n")
-
-                self.term_posting_size[term] = len(self.index[term])
+                    self.term_posting_size.setdefault(term, 0)
+                    self.term_posting_size[term] += len(self.index[term])
                 self.index = {}
+
+    def write_term_size_disk(self):
+
+        print("Writing # of postings for each term to disk")
+        # FIXME: change the file maybe to let the user decide where to store
+        f = open("term_sizes.txt", "w+")
+        for term in self.term_posting_size:
+            f.write(term + " " + str(self.term_posting_size[term]) + "\n")
+        f.close()
+
+    def read_term_size_memory(self, filename):
+        # FIXME: maybe the filename should be an attribute of the indexer
+        print("Reading # of postings for each term to memory")
+        self.term_posting_size = {}
+
+        f = open(filename, "r")
+        for line in f:
+            term, postings = line.strip().split(" ")
+            self.term_posting_size[term] = int(postings)
+        f.close()
 
     def clear_blocks(self):
         print("Removing unused blocks")
@@ -43,6 +64,7 @@ class Indexer:
             except:
                 print("Error removing block files")
         
+        os.rmdir(self.block_directory)
 
     def read_term_to_memory(self, term):
         # TODO: we need to know where this term is stored
@@ -52,6 +74,9 @@ class Indexer:
 
     def merge_block_disk(self):
     
+        if not os.path.exists(self.merge_directory):
+            os.mkdir(self.merge_directory)
+
         blocks = glob.glob(self.block_directory + "*")
         chunk_size = 1000
         threshold = 5000
@@ -93,11 +118,10 @@ class Indexer:
 
             if total >= threshold:
                 # write to file
-                f = open(sorted_terms[0] + "-" + last_term + ".txt", "w+") 
+                f = open(self.merge_directory + sorted_terms[0] + "-" + last_term + ".txt", "w+") 
                 for term in sorted_terms:
                     if term <= last_term2:
-                        for posting in terms[term]:
-                            f.write(term + " " + str(posting) + "\n")
+                        f.write(term + " " + " ".join(sorted(terms[term])) + "\n")
                         del terms[term]
                 f.close()
 
@@ -117,8 +141,6 @@ class Indexer:
             self.write_block_disk()
 
         # terms -> List[Tuple(term, pos)]
-        # FIXME: need the positions but tokenizer is not ready yet
-        #for term, pos in terms:
         for term, pos in terms:
             if self.positional:
                 # index -> Dict[term: Dict[doc: List[pos]]]

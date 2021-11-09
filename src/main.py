@@ -15,3 +15,5 @@ if __name__ == "__main__":
             indexer.index_terms(terms, doc)
 
         indexer.merge_block_disk()
+        indexer.write_term_size_disk()
+        indexer.read_term_size_memory("term_sizes.txt")
