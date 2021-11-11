@@ -3,17 +3,15 @@ from indexer import Indexer
 
 if __name__ == "__main__":
     tokenizer = Tokenizer(stopwords=False, stemmer=False)
-    indexer = Indexer()
+    indexer = Indexer(tokenizer=tokenizer)
 
-    with open("../dataset", "r") as f:
-        f.readline()
-        while f:
-            line = f.readline()
-            if not line:
-                break
-            terms, doc = tokenizer.tokenize(line)
-            indexer.index_terms(terms, doc)
+    indexer.index_file("../dataset")
 
-        indexer.merge_block_disk()
-        indexer.write_term_size_disk()
-        indexer.read_term_size_memory("term_sizes.txt")
+"""
+
+index para os ficheiros gerados
+rename dos ids para inteiros com um contador
+
+
+
+"""
