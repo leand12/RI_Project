@@ -159,8 +159,6 @@ class Indexer:
                 f.readline()
             while f:
                 line = f.readline()
-                if self.load_zip:
-                    line = line.decode("utf-8")         # FIXME: maybe the file is not in utf8
                 
                 if len(line) == 0:
                     # FIXME: if the file ends and it does not reach the trehshold the last terms
@@ -179,7 +177,7 @@ class Indexer:
 
         if self.load_zip:
             try:
-                f = gzip.open(filename, "r")
+                f = gzip.open(filename, "rt")
             except gzip.BadGzipFile:
                 logging.error("The provided file is not compatible with gzip format")
                 exit(1)
@@ -194,7 +192,7 @@ class Indexer:
     def open_merge_file(self, filename):
 
         if self.save_zip:
-            f = gzip.open(filename + ".gz", "w")
+            f = gzip.open(filename + ".gz", "wt")
         else:
             f = open(filename, "w")
         return f 
