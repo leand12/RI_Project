@@ -10,7 +10,8 @@ logging.basicConfig(level=logging.DEBUG, format='%(filename)s:%(lineno)d %(ascti
 
 class Indexer:
 
-    def __init__(self, tokenizer=Tokenizer(), positional=False, load_zip=False, save_zip=False, block_threshold=50000, merge_file_size_threshold=5000, merge_chunk_size=1000,
+    def __init__(self, tokenizer=Tokenizer(), positional=False, load_zip=False, save_zip=False, doc_rename=False,
+         block_threshold=50000, merge_file_size_threshold=5000, merge_chunk_size=1000,
          block_directory="./block/", merge_directory="./indexer/", term_sizes_filename="term_sizes"):
         
         self.positional = positional
@@ -26,6 +27,9 @@ class Indexer:
         self.tokenizer = tokenizer
         self.load_zip = load_zip
         self.save_zip = save_zip
+        self.doc_id_cnt = 0
+        self.doc_ids = {}
+        self.doc_rename = doc_rename
 
     def write_block_disk(self):
 
@@ -62,6 +66,30 @@ class Indexer:
             for line in f:
                 term, postings = line.strip().split(" ")
                 self.term_posting_size[term] = int(postings)
+
+    def write_doc_ids(self):
+
+        if not self.doc_rename:
+            logging.warning("Doc rename is not in use. Cannot write doc ids to disk.")
+            return
+
+        # TODO: allow user to choose the file where it is going to be stored???
+        with open(self.merge_directory + "doc_ids" + ".txt", "w") as f:
+            for doc_id, doc in self.doc_ids.items():
+                f.write(doc_id + " " + doc + "\n")
+
+    def read_doc_ids(self):
+
+        if not self.doc_rename:
+            logging.warning("Doc rename is not in use. Cannot write doc ids to disk.")
+            return
+
+        self.doc_ids = {}
+        with open(self.merge_directory + "doc_ids" + ".txt", "r") as f:
+            for line in f:
+                doc_id, doc = line.strip().split(" ")
+                self.doc_ids[doc_id] = doc
+        self.doc_id_cnt = len(self.doc_ids)
 
     def clear_blocks(self):
         logging.info("Removing unused blocks")
@@ -103,7 +131,7 @@ class Indexer:
                     for doc in docs:
                         line = doc.strip().split(" ")
                         term, doc_lst = line[0], line[1:]
-                        terms.setdefault(term, []).extend(doc_lst) 
+                        terms.setdefault(term, set()).update(doc_lst) 
                     last_terms[b] = term
                 b += 1
             
@@ -138,6 +166,12 @@ class Indexer:
     def index_terms(self, terms, doc):
         # indexes a list of terms provided by the tokenizer
     
+        if self.doc_rename:
+            doc_id = str(self.doc_id_cnt)
+            self.doc_ids[doc_id] = doc
+            doc = doc_id
+            self.doc_id_cnt += 1
+
         # the last indexes need to be written to a block is not full
         if len(self.index.values()) >= self.block_threshold:
             logging.info("Writing to disk")
@@ -162,8 +196,6 @@ class Indexer:
                 f.readline()
             while f:
                 line = f.readline()
-                if self.load_zip:
-                    line = line.decode("utf-8")         # FIXME: maybe the file is not in utf8
                 
                 if len(line) == 0:
                     # FIXME: if the file ends and it does not reach the trehshold the last terms
@@ -176,13 +208,14 @@ class Indexer:
 
             self.merge_block_disk()
             self.write_term_size_disk()
-            self.read_term_size_memory()
+            if self.doc_rename:
+                self.write_doc_ids()
 
     def get_file_to_index(self, filename):
 
         if self.load_zip:
             try:
-                f = gzip.open(filename, "r")
+                f = gzip.open(filename, "rt")
             except gzip.BadGzipFile:
                 logging.error("The provided file is not compatible with gzip format")
                 exit(1)
@@ -197,7 +230,7 @@ class Indexer:
     def open_merge_file(self, filename):
 
         if self.save_zip:
-            f = gzip.open(filename + ".gz", "w")
+            f = gzip.open(filename + ".gz", "wt")
         else:
             f = open(filename, "w")
         return f 
