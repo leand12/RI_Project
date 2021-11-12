@@ -44,12 +44,13 @@ class Indexer:
                     f.write(term + " " + " ".join([
                         doc + "," + ",".join(self.index[term][doc]) for doc in self.index[term]
                     ]) + "\n")
+                    self.term_posting_size.setdefault(term, 0)
+                    self.term_posting_size[term] += len(self.index[term])
             else:
                 for term in sorted(self.index):
                     f.write(term + " " + " ".join(self.index[term]) + "\n")
-                
-            self.term_posting_size.setdefault(term, 0)
-            self.term_posting_size[term] += len(self.index[term])
+                    self.term_posting_size.setdefault(term, 0)
+                    self.term_posting_size[term] += len(self.index[term])
             self.index = {}
 
     def write_term_size_disk(self):

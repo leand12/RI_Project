@@ -3,7 +3,7 @@ from indexer import Indexer
 
 if __name__ == "__main__":
     tokenizer = Tokenizer(stopwords=False, stemmer=False)
-    indexer = Indexer(positional=False, tokenizer=tokenizer, load_zip=False, save_zip=False)
+    indexer = Indexer(doc_rename=True, positional=True, tokenizer=tokenizer, load_zip=False, save_zip=False)
 
     indexer.index_file("../dataset")
 
