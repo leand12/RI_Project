@@ -36,14 +36,17 @@ class Indexer:
         with open(self.block_directory + "block" + str(self.block_cnt) + ".txt", "w+") as f:
             self.block_cnt += 1
             if self.positional:
-                assert False, "Not implemented"
+                for term in sorted(self.index):
+                    f.write(term + " " + " ".join([
+                        doc + "," + ",".join(self.index[term][doc]) for doc in self.index[term]
+                    ]) + "\n")
             else:
-                
-                for term in sorted(self.index.keys()):
+                for term in sorted(self.index):
                     f.write(term + " " + " ".join(self.index[term]) + "\n")
-                    self.term_posting_size.setdefault(term, 0)
-                    self.term_posting_size[term] += len(self.index[term])
-                self.index = {}
+                
+            self.term_posting_size.setdefault(term, 0)
+            self.term_posting_size[term] += len(self.index[term])
+            self.index = {}
 
     def write_term_size_disk(self):
         logging.info("Writing # of postings for each term to disk")
@@ -108,7 +111,7 @@ class Indexer:
             last_term = min(last_terms) if last_terms else last_term
             
             total = 0
-            sorted_terms = sorted(terms.keys())
+            sorted_terms = sorted(terms)
             for term in sorted_terms:
                 if term >= last_term:
                     break

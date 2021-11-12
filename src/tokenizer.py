@@ -22,7 +22,7 @@ class Tokenizer:
         if stopwords:
             self.stopwords = {w.lower() for w in open(dirname + "/../data/nltk_en_stopwords.txt", "r").read().split()}
         if contractions:
-            for line in open(dirname + "/../data/en_contractions.txt", "r").read().split():
+            for line in open(dirname + "/../data/en_contractions.txt", "r"):
                 token, term = line.lower().split(',')
                 self.contractions[token] = term
         if stemmer:
@@ -31,6 +31,7 @@ class Tokenizer:
     def normalize_tokens(self, terms):
         # TODO: what to do with hiphens?
         terms = [re.sub(r'[^\w\s]', ' ', term).split() for term in terms]
+        terms = [term for subterms in terms for term in subterms]
 
         if self.min_length:
             terms = [term for term in terms if len(term) >= self.min_length]
@@ -55,7 +56,7 @@ class Tokenizer:
         #self.update_fields(doc)
         terms = []
         for pos, term in enumerate(self.normalize_tokens(review.split())):
-            terms.append((term, pos))
+            terms.append((term, str(pos)))
         # { token: { doc1: p1, p2} }
         # FIXME: change the return value
         # it is only like this to match the indexer
