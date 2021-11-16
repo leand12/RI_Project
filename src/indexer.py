@@ -4,6 +4,7 @@ import sys
 import os
 import glob
 import gzip
+from timeit import default_timer as timer
 from tokenizer import Tokenizer
 
 logging.basicConfig(level=logging.DEBUG, format='%(filename)s:%(lineno)d %(asctime)s - %(message)s', datefmt='%H:%M:%S')
@@ -62,7 +63,7 @@ class Indexer:
     def write_term_size_disk(self):
         logging.info("Writing # of postings for each term to disk")
         with open(self.merge_directory + self.term_info_filename + ".txt", "w+") as f:
-            for term in self.term_info:
+            for term in sorted(self.term_info):
                 f.write(term + " " + " ".join(str(i) for i in self.term_info[term]).strip() + "\n")
 
     def read_term_size_memory(self):
@@ -109,6 +110,30 @@ class Indexer:
                 logging.error("Error removing block files")
         
         os.rmdir(self.block_directory)
+
+    def open_file_to_index(self, filename):
+
+        if self.load_zip:
+            try:
+                f = gzip.open(filename, "rt")
+            except gzip.BadGzipFile:
+                logging.error("The provided file is not compatible with gzip format")
+                exit(1)
+        else:
+            try:
+                f = open(filename, "r")
+            except:
+                logging.error("Could not open the provided file")
+                exit(1)
+        return f
+
+    def open_merge_file(self, filename):
+
+        if self.save_zip:
+            f = gzip.open(filename + ".gz", "wt")
+        else:
+            f = open(filename, "w")
+        return f
 
     def merge_block_disk(self):
     
@@ -203,7 +228,9 @@ class Indexer:
 
     def index_file(self, filename, skip_lines=1):
 
-        with self.get_file_to_index(filename) as f:
+        start = timer()
+
+        with self.open_file_to_index(filename) as f:
             for _ in range(skip_lines):
                 f.readline()
             while f:
@@ -226,27 +253,4 @@ class Indexer:
             self.read_term_size_memory()
             print(self.term_info)
 
-    def get_file_to_index(self, filename):
-
-        if self.load_zip:
-            try:
-                f = gzip.open(filename, "rt")
-            except gzip.BadGzipFile:
-                logging.error("The provided file is not compatible with gzip format")
-                exit(1)
-        else:
-            try:
-                f = open(filename, "r")
-            except:
-                logging.error("Could not open the provided file")
-                exit(1)
-        return f
-
-    def open_merge_file(self, filename):
-
-        if self.save_zip:
-            f = gzip.open(filename + ".gz", "wt")
-        else:
-            f = open(filename, "w")
-        return f 
-
+        logging.info("Indexing time: " + str(timer() - start))
