@@ -6,31 +6,35 @@ import glob
 import gzip
 from tokenizer import Tokenizer
 
-logging.basicConfig(level=logging.DEBUG, format='%(filename)s:%(lineno)d %(asctime)s - %(message)s', datefmt='%H:%M:%S')
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(filename)s:%(lineno)d %(asctime)s - %(message)s', datefmt='%H:%M:%S')
+
 
 class Indexer:
 
-    def __init__(self, tokenizer=Tokenizer(), positional=False, load_zip=False, save_zip=False, doc_rename=False, file_location=False, file_location_step=100,
-         block_threshold=1000000, merge_file_size_threshold=5000, merge_chunk_size=1000,
-         block_directory="./block/", merge_directory="./indexer/", term_info_filename=".term_info"):
-        
+    def __init__(self, tokenizer=Tokenizer(), positional=False, load_zip=False, save_zip=False, doc_rename=False,
+                 file_location=False, file_location_step=100,
+                 block_threshold=1000000, merge_file_size_threshold=5000, merge_chunk_size=1000,
+                 block_directory="./block/", merge_directory="./indexer/"):
+
         self.positional = positional
         self.index = {}
         self.term_info = {}     # keeps the number of postings of a term
         self.block_directory = block_directory
         self.merge_directory = merge_directory
-        self.term_info_filename = term_info_filename    # FIXME: this does not work if the user provides a directory instead of a file
-        
+        # FIXME: this does not work if the user provides a directory instead of a file
+
         self.__block_cnt = 0
-        self.block_threshold = block_threshold         # change this value or let it be set by the user
+        # change this value or let it be set by the user
+        self.block_threshold = block_threshold
         self.merge_file_size_threshold = merge_file_size_threshold
         self.merge_chunk_size = merge_chunk_size
-        
+
         self.tokenizer = tokenizer
-        
+
         self.load_zip = load_zip
         self.save_zip = save_zip
-        
+
         self.__doc_id_cnt = 0
         self.doc_ids = {}
         self.doc_rename = doc_rename
@@ -52,16 +56,18 @@ class Indexer:
                     f.write(term + " " + " ".join([
                         doc + "," + ",".join(self.index[term][doc]) for doc in self.index[term]
                     ]) + "\n")
-                    self.term_info.setdefault(term, [0, ''])[0] += len(self.index[term])
+                    self.term_info.setdefault(term, [0, ''])[
+                        0] += len(self.index[term])
             else:
                 for term in sorted(self.index):
                     f.write(term + " " + " ".join(self.index[term]) + "\n")
-                    self.term_info.setdefault(term, [0, ''])[0] += len(self.index[term])
+                    self.term_info.setdefault(term, [0, ''])[
+                        0] += len(self.index[term])
             self.index = {}
 
     def write_term_size_disk(self):
         logging.info("Writing # of postings for each term to disk")
-        with open(self.merge_directory + self.term_info_filename + ".txt", "w+") as f:
+        with open(self.merge_directory + ".metadata/term_info.txt", "w+") as f:
             for term in self.term_info:
                 f.write(term + " " + " ".join(str(i) for i in self.term_info[term]).strip() + "\n")
 
@@ -69,56 +75,120 @@ class Indexer:
         logging.info("Reading # of postings for each term to memory")
         self.term_info = {}
 
-        with open(self.merge_directory + self.term_info_filename + ".txt", "r") as f:
+        with open(self.merge_directory + ".metadata/term_info.txt", "r") as f:
             for line in f:
                 term, *rest = line.strip().split(" ")
                 self.term_info[term] = [int(i) for i in rest]
+        print(self.term_info["game"])
 
     def write_doc_ids(self):
 
         if not self.doc_rename:
-            logging.warning("Doc rename is not in use. Cannot write doc ids to disk.")
+            logging.warning(
+                "Doc rename is not in use. Cannot write doc ids to disk.")
             return
 
         # TODO: allow user to choose the file where it is going to be stored???
-        with open(self.merge_directory + "doc_ids" + ".txt", "w") as f:
+        with open(self.merge_directory + ".metadata/doc_ids.txt", "w") as f:
             for doc_id, doc in self.doc_ids.items():
                 f.write(doc_id + " " + doc + "\n")
 
     def read_doc_ids(self):
 
         if not self.doc_rename:
-            logging.warning("Doc rename is not in use. Cannot write doc ids to disk.")
+            logging.warning(
+                "Doc rename is not in use. Cannot write doc ids to disk.")
             return
 
         self.doc_ids = {}
-        with open(self.merge_directory + "doc_ids" + ".txt", "r") as f:
+        with open(self.merge_directory + ".metadata/doc_ids.txt", "r") as f:
             for line in f:
                 doc_id, doc = line.strip().split(" ")
                 self.doc_ids[doc_id] = doc
         self.__doc_id_cnt = len(self.doc_ids)
 
+    def read_posting_lists(self, term):
+
+        # search for file
+        files = glob.glob(self.merge_directory + "/*.txt")
+        term_file = None
+        for f in files:
+            f_terms = f.split("/")[-1].split(".txt")[0].split(" ") # FIXME: not sure
+            print(f_terms[0])
+            print(f_terms[1])
+            if f > f_terms[0] and f < f_terms[1]:
+                print(f)
+                term_file = f
+                break
+
+        # search position on file
+        if term_file != None:
+
+            if self.file_location:
+                term_location = 0
+                sorted_term_info = sorted(self.term_info.keys())
+                initial_term, final_term = f.split("/")[-1].split(".txt")[0].split(" ") # FIXME: not sure
+                for i, v in enumerate(sorted_term_info):
+                    if v == initial_term:
+                        break
+                print(initial_term)
+                for i in range(i, len(sorted_term_info)-self.file_location_step, self.file_location_step):
+                    if sorted_term_info[i] <= term and sorted_term_info[i+1] > term:
+                        term_location = self.term_info[sorted_term_info[i]][1]
+                        break
+
+                with open(term_file, "r") as f:
+                    for i in range(term_location):
+                        f.readline()
+
+                    while True:
+                        if self.positional:
+                            term_r, *postings = f.readline().strip().split(" ")
+                            postings = [pos.split(',')[0] for pos in postings]
+                        else:
+                            term_r, *postings = f.readline().strip().split(" ")
+
+                        if term == term_r:
+                            return postings
+            else:
+                with open(term_file, "r") as f:
+                    for line in f:
+                        if self.positional:
+                            term_r, *postings = f.readline().strip().split(" ")
+                            postings = [pos.split(',')[0] for pos in postings]
+                        else:
+                            term_r, *postings = line.strip().split(" ") 
+
+                        print(term_r, term)
+                        if term_r == term:
+                            return postings
+        else:
+            print("ta mal")
+    
     def clear_blocks(self):
         logging.info("Removing unused blocks")
-        blocks = glob.glob("./block/block*.txt")
-        
+        blocks = glob.glob(self.block_directory + "block*.txt")
+
         for block in blocks:
             try:
                 os.remove(block)
             except:
                 logging.error("Error removing block files")
-        
+
         os.rmdir(self.block_directory)
 
     def merge_block_disk(self):
-    
+
         if not os.path.exists(self.merge_directory):
             os.mkdir(self.merge_directory)
+            os.mkdir(self.merge_directory + ".metadata/")
 
         # opens every block file and stores the file pointers in a list
-        blocks = [open(block, "r") for block in glob.glob(self.block_directory + "*")]
+        blocks = [open(block, "r")
+                  for block in glob.glob(self.block_directory + "*")]
         terms = {}
-        last_terms = [None for _ in range(len(blocks))]     # keeps the last term for every block
+        # keeps the last term for every block
+        last_terms = [None for _ in range(len(blocks))]
         last_term = None                                    # keeps the min last term
 
         while blocks or terms:
@@ -138,13 +208,13 @@ class Indexer:
                     for doc in docs:
                         line = doc.strip().split(" ")
                         term, doc_lst = line[0], line[1:]
-                        terms.setdefault(term, set()).update(doc_lst) 
+                        terms.setdefault(term, set()).update(doc_lst)
                     last_terms[b] = term
                 b += 1
-            
+
             # last_term is only updated if the list is not empty
             last_term = min(last_terms) if last_terms else last_term
-            
+
             total = 0
             sorted_terms = sorted(terms)
             for term in sorted_terms:
@@ -176,7 +246,7 @@ class Indexer:
 
     def index_terms(self, terms, doc):
         # indexes a list of terms provided by the tokenizer
-    
+
         if self.doc_rename:
             doc_id = str(self.__doc_id_cnt)
             self.doc_ids[doc_id] = doc
@@ -208,11 +278,8 @@ class Indexer:
                 f.readline()
             while f:
                 line = f.readline()
-                
+
                 if len(line) == 0:
-                    # FIXME: if the file ends and it does not reach the trehshold the last terms
-                    # will not be written to disk in a block
-                    # this fixes it but is bad
                     self.write_block_disk()
                     break
                 terms, doc = self.tokenizer.tokenize(line)
@@ -224,7 +291,6 @@ class Indexer:
                 self.write_doc_ids()
 
             self.read_term_size_memory()
-            print(self.term_info)
 
     def get_file_to_index(self, filename):
 
@@ -232,7 +298,8 @@ class Indexer:
             try:
                 f = gzip.open(filename, "rt")
             except gzip.BadGzipFile:
-                logging.error("The provided file is not compatible with gzip format")
+                logging.error(
+                    "The provided file is not compatible with gzip format")
                 exit(1)
         else:
             try:
@@ -248,5 +315,4 @@ class Indexer:
             f = gzip.open(filename + ".gz", "wt")
         else:
             f = open(filename, "w")
-        return f 
-
+        return f
