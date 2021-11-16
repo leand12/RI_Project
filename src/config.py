@@ -19,7 +19,6 @@ def create_default_file(filename="config.json"):
             "merge_chunk_size": 1000,
             "block_directory":"./block/",
             "merge_directory": "./indexer/",
-            "term_info_filename": ".term_info"
         }
 
         tokenizer = {

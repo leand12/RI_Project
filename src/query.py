@@ -16,20 +16,20 @@ class Query:
     def search(self, query):
 
         terms = self.indexer.tokenizer.normalize_tokens(query.strip().split())
-        sizes = [self.indexer.term_info[term][0] if self.indexer.term_info[term] else 0 for term in terms ]
-        terms = zip(terms, sizes)
+        sizes = [self.indexer.term_info[term][0] if self.indexer.term_info.get(term) else 0 for term in terms ]
+        terms = list(zip(terms, sizes))
         print(terms)
-
         temp = {}
 
         while len(terms) != 1:
-            terms.sort(key=lambda x: x[1])
+            terms.sort(key=lambda x: -x[1])
             t1, s1 = terms.pop()
             t2, s2 = terms.pop()
+            print(terms)
 
             if not s1 or not s2:
                 logging.info("No results found")
-                break
+                return
 
             if t1 not in temp:
                 l1 = self.indexer.read_posting_lists(t1)
@@ -45,3 +45,12 @@ class Query:
             temp[n_term] = set(l1) & set(l2)
             terms.append((n_term, len(temp[n_term])))
         
+        if terms[0][1]:
+            if terms[0][0] not in temp:
+                l1 = self.indexer.read_posting_lists(terms[0][0])
+            else:
+                l1 = temp[terms[0][0]]
+            print(l1)
+            return l1
+        else:
+            print("No results found")
