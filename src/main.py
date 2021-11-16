@@ -1,5 +1,6 @@
 from tokenizer import Tokenizer
 from indexer import Indexer
+from query import Query
 
 if __name__ == "__main__":
     tokenizer = Tokenizer(stopwords=False, stemmer=False)
@@ -7,9 +8,14 @@ if __name__ == "__main__":
 
     indexer.index_file("../dataset")
 
+    query = Query(indexer)
+
+    q = input("Search: ")
+    query.search(q)
+
+
 """
 
 index para os ficheiros gerados, com steps e usar binary search
 
-term #postings file_location
 """
