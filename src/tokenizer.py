@@ -29,8 +29,7 @@ class Tokenizer:
             self.stemmer = SnowballStemmer("english")
 
     def normalize_tokens(self, terms):
-        # TODO: what to do with hiphens?
-        terms = [re.sub(r'[^\w\s]', ' ', term).split() for term in terms]
+        terms = [re.sub(r'[^a-zA-Z0-9]', ' ', term).split() for term in terms]
         terms = [term for subterms in terms for term in subterms]
 
         if self.min_length:
