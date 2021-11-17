@@ -248,7 +248,7 @@ class Indexer:
 
             if total >= self.merge_file_size_threshold:
                 # writes the terms to the file when the terms do not go pass a threshold
-                with self.open_merge_file(self.merge_directory + sorted_terms[0] + " " + last_term + ".txt") as f:
+                with self.open_merge_file(self.merge_directory + sorted_terms[0] + " " + term + ".txt") as f:
                     for ti, t in enumerate(sorted_terms):
                         if t <= term:
                             f.write(t + " " + " ".join(sorted(terms[t])) + "\n")
@@ -257,7 +257,7 @@ class Indexer:
                             del terms[t]
             elif not blocks:
                 # this will write the terms left in the last block
-                with self.open_merge_file(self.merge_directory + sorted_terms[0] + " " + last_term + ".txt") as f:
+                with self.open_merge_file(self.merge_directory + sorted_terms[0] + " " + term + ".txt") as f:
                     for ti, t in enumerate(sorted_terms):
                         f.write(t + " " + " ".join(sorted(terms[t])) + "\n")
                         if self.file_location and ti % self.file_location_step == 0:
