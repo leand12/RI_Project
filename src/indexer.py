@@ -4,11 +4,7 @@ import sys
 import os
 import glob
 import gzip
-from timeit import default_timer as timer
 from tokenizer import Tokenizer
-
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(filename)s:%(lineno)d %(asctime)s - %(message)s', datefmt='%H:%M:%S')
 
 
 class Indexer:
@@ -130,7 +126,8 @@ class Indexer:
                 sorted_term_info = sorted(self.term_info.keys())
                 initial_term, final_term = term_file.split(
                     "/")[-1].split(".txt")[0].split(" ")  # FIXME: not sure
-                    
+                
+                # TODO: future work: binary search #
                 for j, v in enumerate(sorted_term_info):
                     if v == initial_term:
                         break
@@ -139,6 +136,7 @@ class Indexer:
                     if sorted_term_info[i] <= term and sorted_term_info[i + self.file_location_step] > term:
                         term_location = i - j
                         break
+                ##
 
                 with open(term_file, "r") as f:
                     for i in range(term_location):
@@ -300,8 +298,6 @@ class Indexer:
 
     def index_file(self, filename, skip_lines=1):
 
-        start = timer()
-
         with self.open_file_to_index(filename) as f:
             for _ in range(skip_lines):
                 f.readline()
@@ -320,5 +316,3 @@ class Indexer:
                 self.write_doc_ids()
 
             self.read_term_size_memory()
-
-        logging.info("Indexing time: " + str(timer() - start))

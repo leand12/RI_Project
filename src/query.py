@@ -1,7 +1,5 @@
 import logging
 
-logging.basicConfig(level=logging.DEBUG, format='%(filename)s:%(lineno)d %(asctime)s - %(message)s', datefmt='%H:%M:%S')
-
 class Query:
 
     def __init__(self, indexer):
@@ -21,15 +19,14 @@ class Query:
         print(terms)
         temp = {}
 
-        while len(terms) != 1:
+        while len(terms) > 1:
             terms.sort(key=lambda x: -x[1])
             t1, s1 = terms.pop()
             t2, s2 = terms.pop()
             print(terms)
 
             if not s1 or not s2:
-                logging.info("No results found")
-                return
+                return None
 
             if t1 not in temp:
                 l1 = set(self.indexer.read_posting_lists(t1))
@@ -45,12 +42,11 @@ class Query:
             temp[n_term] = l1 & l2
             terms.append((n_term, len(temp[n_term])))
         
-        if terms[0][1]:
+        if terms and terms[0][1]:
             if terms[0][0] not in temp:
                 l1 = set(self.indexer.read_posting_lists(terms[0][0]))
             else:
                 l1 = temp[terms[0][0]]
             print(l1)
             return l1
-        else:
-            print("No results found")
+        return None
