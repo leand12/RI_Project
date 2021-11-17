@@ -16,13 +16,14 @@ class Indexer:
     def __init__(self, tokenizer=Tokenizer(), positional=False, load_zip=False, save_zip=False, doc_rename=False,
                  file_location=False, file_location_step=100,
                  block_threshold=1000000, merge_file_size_threshold=5000, merge_chunk_size=1000,
-                 block_directory="./block/", merge_directory="./indexer/"):
+                 block_directory="block/", merge_directory="indexer/"):
 
         self.positional = positional
         self.index = {}
         self.term_info = {}     # keeps the number of postings of a term
-        self.block_directory = block_directory
-        self.merge_directory = merge_directory
+        dirname, _ = os.path.split(os.path.abspath(__file__))
+        self.block_directory = dirname + "/" + block_directory
+        self.merge_directory = dirname + "/" + merge_directory
         # FIXME: this does not work if the user provides a directory instead of a file
 
         self.__block_cnt = 0
@@ -70,7 +71,8 @@ class Indexer:
         logging.info("Writing # of postings for each term to disk")
         with open(self.merge_directory + ".metadata/term_info.txt", "w+") as f:
             for term in sorted(self.term_info):
-                f.write(term + " " + " ".join(str(i) for i in self.term_info[term]).strip() + "\n")
+                f.write(term + " " + " ".join(str(i)
+                        for i in self.term_info[term]).strip() + "\n")
 
     def read_term_size_memory(self):
         logging.info("Reading # of postings for each term to memory")
@@ -114,8 +116,9 @@ class Indexer:
         files = glob.glob(self.merge_directory + "/*.txt")
         term_file = None
         for f in files:
-            f_terms = f.split("/")[-1].split(".txt")[0].split(" ") # FIXME: not sure
-            if term > f_terms[0] and term < f_terms[1]:
+            # FIXME: not sure
+            f_terms = f.split("/")[-1].split(".txt")[0].split(" ")
+            if term >= f_terms[0] and term <= f_terms[1]:
                 term_file = f
                 break
 
@@ -125,14 +128,16 @@ class Indexer:
             if self.file_location:
                 term_location = 0
                 sorted_term_info = sorted(self.term_info.keys())
-                initial_term, final_term = f.split("/")[-1].split(".txt")[0].split(" ") # FIXME: not sure
-                for i, v in enumerate(sorted_term_info):
+                initial_term, final_term = term_file.split(
+                    "/")[-1].split(".txt")[0].split(" ")  # FIXME: not sure
+                    
+                for j, v in enumerate(sorted_term_info):
                     if v == initial_term:
                         break
-                print(initial_term)
-                for i in range(i, len(sorted_term_info)-self.file_location_step, self.file_location_step):
-                    if sorted_term_info[i] <= term and sorted_term_info[i+1] > term:
-                        term_location = self.term_info[sorted_term_info[i]][1]
+
+                for i in range(j, len(sorted_term_info), self.file_location_step):
+                    if sorted_term_info[i] <= term and sorted_term_info[i + self.file_location_step] > term:
+                        term_location = i - j
                         break
 
                 with open(term_file, "r") as f:
@@ -155,14 +160,14 @@ class Indexer:
                             term_r, *postings = f.readline().strip().split(" ")
                             postings = [pos.split(',')[0] for pos in postings]
                         else:
-                            term_r, *postings = line.strip().split(" ") 
+                            term_r, *postings = line.strip().split(" ")
 
                         print(term_r, term)
                         if term_r == term:
                             return postings
         else:
             print("ta mal")
-    
+
     def clear_blocks(self):
         logging.info("Removing unused blocks")
         blocks = glob.glob(self.block_directory + "block*.txt")

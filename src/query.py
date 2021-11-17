@@ -32,22 +32,22 @@ class Query:
                 return
 
             if t1 not in temp:
-                l1 = self.indexer.read_posting_lists(t1)
+                l1 = set(self.indexer.read_posting_lists(t1))
             else:
                 l1 = temp[t1]
 
             if t2 not in temp:
-                l2 = self.indexer.read_posting_lists(t2)
+                l2 = set(self.indexer.read_posting_lists(t2))
             else:
                 l2 = temp[t2]
 
             n_term = t1 + " " + t2
-            temp[n_term] = set(l1) & set(l2)
+            temp[n_term] = l1 & l2
             terms.append((n_term, len(temp[n_term])))
         
         if terms[0][1]:
             if terms[0][0] not in temp:
-                l1 = self.indexer.read_posting_lists(terms[0][0])
+                l1 = set(self.indexer.read_posting_lists(terms[0][0]))
             else:
                 l1 = temp[terms[0][0]]
             print(l1)
