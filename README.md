@@ -8,6 +8,52 @@ Bruno Bastos\
 Leandro Silva
 
 
+## How it works
+
+There are 3 important files in this project: tokenizer.py, indexer.py and query.py.
+
+
+### Tokenizer
+
+The tokenizer is responsible for the processing of tokens in a document. Its main functionalities
+are transforming the tokens into terms and pass thoes terms to the indexer together with the information of the document, such as id and position of the token.
+
+There are multiple strategies that are being used here.
+The tokenizer reads one document at a time and, after selecting the required fields, it splits the text word by word, where each word is splitted by a space.
+
+With this list of tokens, it then normalizes each token, transforming it into a term.
+Every token that has a non alphanumeric character, will have that character replace by a space, and then the tokens are splitted, forming more tokens.
+The user can set the minimum length of a token and those that are smaller than that number will be discarded.
+A stopword file containing the tokens that should be discarded can be provided by the user but it is not necessary.
+There can also be provided a list of contractions, which is mostly used in english, that will transform contractions into the respective tokens.(ex: I've -> I have)
+There is an option to remove every token that is a number, integer or float.
+It is used casefolding to make each token lowercase and transform some letters into others.
+Finally, the remaing tokens will go through the stemmer and the result will be a list of terms.
+
+The list of terms is then given to the indexer with the positional information of the term and the document id.
+
+
+### Indexer
+
+The indexer makes use of the list of terms provided by the tokenizer and starts the indexing process.
+Every term is stored in an hashtable(dict) together with the list of postings(list with the ids of the documents where the term appears). If the "positional" flag is set, instead of storing a list postings, it is stored for each term a dictionary with the document id and a respective list of positions where that term appears in that document.
+Whenever the number of postings reaches a threshold, that can be defined by the user, "block_threhsold", the index will be written to a temporary file called block. When writing to that file, the terms are sorted and stored one per line. Each line contains a term followed by a list of document ids separated by a space(ex: term doc1 doc2). If the "positional" flag is set, the positions in a document are separated by a comma(ex: term doc1,pos1,pos2 doc2,pos1). 
+
+After the entire file is indexed, the indexer will proceed to merge every temporary block file. First it reads a chunk of adjustable size for each block file. Every term and posting list in the blocks chunks are stored in a temporary dictionary. Only the terms that will not appear in another block can be written to disk sorted alphabetically. In order to do so, there is an list that keeps track of the last term read for each of the blocks. Since the blocks are also sorted, it is always garanteed that the "smallest" last term from that list is the last term that can be written. So, after there is an amount of terms that is higher than a defined threshold, the terms on the dictionary that are "smaller" than the "smallest" one on the list, will all be written to a file, which the name contains the first term and the last separated by a space(ex:"hello hi.txt")
+
+When all the blocks are fully read, the indexer finishes its job by writing a few metadada files to a ".metadata" directory inside the indexed files directory.
+
+In a file called "term_info.txt" it will store the posting list sizes for the correspondent term. If the flag "file_location" is set, then it will also store the position of the term in the indexed file for every step, which is defined in the parameter "file_location_step", meaning that every n terms there is another number pointing to its position in the indexed file.
+
+If the flag "doc_rename" is set, then the file "doc_ids.txt" is also saved. This file contains a correspondance between a number and the document id. When indexing the number will be written to disk instead of the id of the document. 
+
+Finally, the indexer needs to save its configuration for it to load whenever it neads to perform a query. This file is saved as "config.json". 
+
+ 
+ ## Results
+
+
+
 ## How to run
 
 The indexer and tokinizer provide the user a range of different options to customize the way they work. Files can be runned providing the desired parameters via terminal or by using a configuration file.
