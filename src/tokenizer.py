@@ -15,7 +15,7 @@ class Tokenizer:
 
     def __init__(self, case_folding=True, no_numbers=True, stemmer=True, min_length=3,
                  stopwords_file="../data/nltk_en_stopwords.txt", 
-                 contractions_file="../data/en_contractions.txt"):
+                 contractions_file="../data/en_contractions.txt", **ignore):
 
         self.min_length = min_length
         self.case_folding = case_folding

@@ -12,8 +12,8 @@ class Indexer:
 
     def __init__(self, tokenizer=Tokenizer(), positional=False, load_zip=False, save_zip=False, rename_doc=False,
                  file_location=False, file_location_step=100,
-                 block_threshold=1000000, merge_threshold=5000, merge_chunk_size=1000,
-                 block_dir="block/", merge_dir="indexer/"):
+                 block_threshold=1_000_000, merge_threshold=1_000_000, merge_chunk_size=1000,
+                 block_dir="block/", merge_dir="indexer/", **ignore):
 
         self.positional = positional
         self.index = {}
