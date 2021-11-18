@@ -10,7 +10,7 @@ from utils import convert_size, get_directory_size
 
 class Indexer:
 
-    def __init__(self, tokenizer=Tokenizer(), positional=False, load_zip=False, save_zip=False, rename_doc=False,
+    def __init__(self, tokenizer=Tokenizer(), positional=False, save_zip=False, rename_doc=False,
                  file_location=False, file_location_step=100,
                  block_threshold=1_000_000, merge_threshold=1_000_000, merge_chunk_size=1000,
                  block_dir="block/", merge_dir="indexer/", **ignore):
@@ -30,7 +30,6 @@ class Indexer:
 
         self.tokenizer = tokenizer
 
-        self.load_zip = load_zip
         self.save_zip = save_zip
 
         self.__doc_id_cnt = 0
@@ -190,7 +189,7 @@ class Indexer:
 
     def open_file_to_index(self, filename):
 
-        if self.load_zip:
+        if filename.endswith(".gz"):
             try:
                 f = gzip.open(filename, "rt")
             except gzip.BadGzipFile:

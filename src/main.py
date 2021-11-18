@@ -1,5 +1,6 @@
 import os
 import logging
+import coloredlogs
 import argparse
 from tokenizer import Tokenizer
 from indexer import Indexer
@@ -7,8 +8,13 @@ from query import Query
 from timeit import default_timer as timer
 
 
-logging.basicConfig(level=logging.DEBUG, datefmt='%H:%M:%S',
-                    format='\33[1m\33[34m%(filename)s:%(lineno)d %(asctime)s\33[0m - %(message)s')
+logger = logging.getLogger(__name__)  # get a specific logger object
+coloredlogs.install(level='DEBUG')  # install a handler on the root logger with level debug
+coloredlogs.install(level='DEBUG', logger=logger)  # pass a specific logger object
+coloredlogs.install(
+    level='DEBUG', logger=logger, datefmt='%H:%M:%S',
+    fmt='\33[1m\33[34m%(filename)s:%(lineno)d %(asctime)s\33[0m - %(message)s'
+)
 
 
 parser = argparse.ArgumentParser(
@@ -24,8 +30,6 @@ group.add_argument('-i', '--indexer', metavar='DIR',
 group1 = parser.add_argument_group('indexer optional arguments')
 group1.add_argument('--positional', action='store_true',
                     help='save the terms\' positions in a document')
-group1.add_argument('--load-zip', action='store_true',
-                    help='')
 group1.add_argument('--save-zip', action='store_true',
                     help='')
 group1.add_argument('--doc-rename', action='store_true',
@@ -66,7 +70,7 @@ if __name__ == "__main__":
     indexer = Indexer(**args)
 
     start = timer()
-    indexer.index_file("../dataset")
+    indexer.index_file(args["dataset"])
     logging.info(f"Finished indexing ({timer() - start:.2f} seconds)")
     logging.info(f"Vocabulary size: {indexer.vocabulary_size}")
     logging.info(f"Index size on disk: {indexer.disk_size}")

@@ -22,12 +22,6 @@ The indexer has a few options:
 ```
 when provided, saves the terms' positions in a document. This increases the required RAM and disk space, but can give better results when searching for a phrase.
 
---load-zip
-```
-
-```
-when provided, expects a zipped file to be passed as an argument. It will then unzip the file as it reads it. This decreases the amount of space required to store the file, since it is zipped, but the process of unzipping while reading it takes more time.
-
 --save-zip
 ```
 

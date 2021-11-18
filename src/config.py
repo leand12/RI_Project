@@ -9,7 +9,6 @@ def create_default_file(filename="config.json"):
 
         indexer = {
             "positional": False,
-            "load_zip": False,
             "save_zip": False,
             "rename_doc": False,
             "file_location": False,
