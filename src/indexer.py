@@ -9,6 +9,7 @@ import gzip
 from tokenizer import Tokenizer
 from utils import convert_size, get_directory_size
 
+
 class Indexer:
 
     def __init__(self, tokenizer=Tokenizer(), positional=False, save_zip=False, rename_doc=False,
@@ -81,23 +82,23 @@ class Indexer:
 
             indexer = {
                 "positional": self.positional,
-                "save_zip":self.save_zip,
-                "rename_doc":self.rename_doc,
-                "file_location":self.file_location,
-                "file_location_step":self.file_location_step,
-                "block_threshold":self.block_threshold,
-                "merge_threshold":self.merge_threshold,
-                "merge_chunk_size":self.merge_chunk_size,
-                "block_dir":self.block_dir,
-                "merge_dir":self.merge_dir,
+                "save_zip": self.save_zip,
+                "rename_doc": self.rename_doc,
+                "file_location": self.file_location,
+                "file_location_step": self.file_location_step,
+                "block_threshold": self.block_threshold,
+                "merge_threshold": self.merge_threshold,
+                "merge_chunk_size": self.merge_chunk_size,
+                "block_dir": self.block_dir,
+                "merge_dir": self.merge_dir,
             }
             tokenizer = {
-                "min_length":self.tokenizer.min_length,
-                "case_folding":self.tokenizer.case_folding,
-                "no_numbers":self.tokenizer.no_numbers,
-                "stopwords_file":self.tokenizer.stopwords_file,
-                "contractions_file":self.tokenizer.contractions_file,
-                "stemmer":True if self.tokenizer.stemmer else False
+                "min_length": self.tokenizer.min_length,
+                "case_folding": self.tokenizer.case_folding,
+                "no_numbers": self.tokenizer.no_numbers,
+                "stopwords_file": self.tokenizer.stopwords_file,
+                "contractions_file": self.tokenizer.contractions_file,
+                "stemmer": True if self.tokenizer.stemmer else False
             }
 
             data = {"indexer": indexer, "tokenizer": tokenizer}
@@ -202,7 +203,8 @@ class Indexer:
                         if term_r == term:
                             return postings
         else:
-            logging.error("An error occured when searching for the term:" + term)
+            logging.error(
+                "An error occured when searching for the term:" + term)
             exit(1)
 
     def clear_blocks(self):

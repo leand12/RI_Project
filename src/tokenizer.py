@@ -7,8 +7,8 @@ import re
 
 class Review:
     ID = 2
-    HEADLINE = 12
-    BODY = 13
+    HEADLINE = -3
+    BODY = -2
 
 
 class Tokenizer:

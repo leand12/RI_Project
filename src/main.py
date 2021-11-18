@@ -8,9 +8,9 @@ from query import Query
 from timeit import default_timer as timer
 
 
-logger = logging.getLogger(__name__)  # get a specific logger object
-coloredlogs.install(level='DEBUG')  # install a handler on the root logger with level debug
-coloredlogs.install(level='DEBUG', logger=logger)  # pass a specific logger object
+logger = logging.getLogger(__name__)
+coloredlogs.install(level='DEBUG')
+coloredlogs.install(level='DEBUG', logger=logger)
 coloredlogs.install(
     level='DEBUG', logger=logger, datefmt='%H:%M:%S',
     fmt='\33[1m\33[34m%(filename)s:%(lineno)d %(asctime)s\33[0m - %(message)s'
@@ -67,7 +67,7 @@ args = vars(parser.parse_args())
 
 if __name__ == "__main__":
     tokenizer = Tokenizer(**args)
-    indexer = Indexer(**args)
+    indexer = Indexer(tokenizer=tokenizer, **args)
 
     start = timer()
     indexer.index_file(args["dataset"])
