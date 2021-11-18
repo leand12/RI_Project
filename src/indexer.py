@@ -1,11 +1,12 @@
 import logging
+import math
 import re
 import sys
 import os
 import glob
 import gzip
 from tokenizer import Tokenizer
-
+from utils import convert_size, get_directory_size
 
 class Indexer:
 
@@ -39,6 +40,18 @@ class Indexer:
         self.file_location = file_location
         self.file_location_step = file_location_step
         self.__post_cnt = 0
+
+    @property
+    def vocabulary_size(self):
+        return len(self.term_info)
+
+    @property
+    def num_segments(self):
+        return self.__block_cnt
+
+    @property
+    def disk_size(self):
+        return convert_size(get_directory_size(self.merge_dir))
 
     def write_block_disk(self):
 
@@ -77,7 +90,6 @@ class Indexer:
             for line in f:
                 term, *rest = line.strip().split(" ")
                 self.term_info[term] = [int(i) for i in rest]
-        print(self.term_info["game"])
 
     def write_doc_ids(self):
 
@@ -124,7 +136,7 @@ class Indexer:
                 sorted_term_info = sorted(self.term_info.keys())
                 initial_term, final_term = term_file.split(
                     "/")[-1].split(".txt")[0].split(" ")
-                
+
                 # TODO: future work: binary search #
                 for j, v in enumerate(sorted_term_info):
                     if v == initial_term:
@@ -182,7 +194,8 @@ class Indexer:
             try:
                 f = gzip.open(filename, "rt")
             except gzip.BadGzipFile:
-                logging.error("The provided file is not compatible with gzip format")
+                logging.error(
+                    "The provided file is not compatible with gzip format")
                 exit(1)
         else:
             try:
@@ -252,7 +265,8 @@ class Indexer:
                 with self.open_merge_file(self.merge_dir + sorted_terms[0] + " " + term + ".txt") as f:
                     for ti, t in enumerate(sorted_terms):
                         if t <= term:
-                            f.write(t + " " + " ".join(sorted(terms[t])) + "\n")
+                            f.write(
+                                t + " " + " ".join(sorted(terms[t])) + "\n")
                             if self.file_location and ti % self.file_location_step == 0:
                                 self.term_info[t][1] = ti + 1
                             del terms[t]
