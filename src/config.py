@@ -9,25 +9,23 @@ def create_default_file(filename="config.json"):
 
         indexer = {
             "positional": False,
-            "load_zip": False,
             "save_zip": False,
-            "doc_rename": False,
+            "rename_doc": False,
             "file_location": False,
             "file_location_step": 100,
             "block_threshold": 1000000,
-            "merge_file_size_threshold": 5000,
+            "merge_threshold": 5000,
             "merge_chunk_size": 1000,
-            "block_directory":"./block/",
-            "merge_directory": "./indexer/",
+            "block_dir": "block/",
+            "merge_dir": "indexer/",
         }
-
         tokenizer = {
-            "min_length":3,
-            "case_folding":True,
-            "no_numbers":True,
-            "stopwords":True,
-            "contractions":True,
-            "stemmer":True
+            "min_length": 3,
+            "case_folding": True,
+            "no_numbers": True,
+            "stopwords_file": None,
+            "contractions_file": None,
+            "stemmer": True
         }
 
         data = {"indexer": indexer, "tokenizer": tokenizer}
@@ -37,7 +35,7 @@ def create_default_file(filename="config.json"):
 def read_config(filename):
     with open(filename, "r") as f:
         data = json.loads(f.read())
-    
+
     indexer_data = data.get("indexer")
     tokenizer_data = data.get("tokenizer")
 
@@ -51,9 +49,8 @@ def read_config(filename):
     else:
         indexer = Indexer(tokenizer=tokenizer)
 
-    print(indexer_data)
-    print(tokenizer_data)
+    return indexer
+
 
 create_default_file()
 read_config("config.json")
-
