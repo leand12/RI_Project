@@ -9,23 +9,22 @@ from tokenizer import Tokenizer
 
 class Indexer:
 
-    def __init__(self, tokenizer=Tokenizer(), positional=False, load_zip=False, save_zip=False, doc_rename=False,
+    def __init__(self, tokenizer=Tokenizer(), positional=False, load_zip=False, save_zip=False, rename_doc=False,
                  file_location=False, file_location_step=100,
-                 block_threshold=1000000, merge_file_size_threshold=5000, merge_chunk_size=1000,
-                 block_directory="block/", merge_directory="indexer/"):
+                 block_threshold=1000000, merge_threshold=5000, merge_chunk_size=1000,
+                 block_dir="block/", merge_dir="indexer/"):
 
         self.positional = positional
         self.index = {}
         self.term_info = {}     # keeps the number of postings of a term
-        dirname, _ = os.path.split(os.path.abspath(__file__))
-        self.block_directory = dirname + "/" + block_directory
-        self.merge_directory = dirname + "/" + merge_directory
-        # FIXME: this does not work if the user provides a directory instead of a file
+        path, _ = os.path.split(os.path.abspath(__file__))
+        self.block_dir = path + "/" + block_dir
+        self.merge_dir = path + "/" + merge_dir
 
         self.__block_cnt = 0
-        # change this value or let it be set by the user
+        # TODO: change this value or let it be set by the user
         self.block_threshold = block_threshold
-        self.merge_file_size_threshold = merge_file_size_threshold
+        self.merge_threshold = merge_threshold
         self.merge_chunk_size = merge_chunk_size
 
         self.tokenizer = tokenizer
@@ -35,7 +34,7 @@ class Indexer:
 
         self.__doc_id_cnt = 0
         self.doc_ids = {}
-        self.doc_rename = doc_rename
+        self.rename_doc = rename_doc
 
         self.file_location = file_location
         self.file_location_step = file_location_step
@@ -43,11 +42,11 @@ class Indexer:
 
     def write_block_disk(self):
 
-        if not os.path.exists(self.block_directory):
-            os.mkdir(self.block_directory)
+        if not os.path.exists(self.block_dir):
+            os.mkdir(self.block_dir)
         self.__post_cnt = 0
         # writes the current indexer block to disk
-        with open(self.block_directory + "block" + str(self.__block_cnt) + ".txt", "w+") as f:
+        with open(self.block_dir + "block" + str(self.__block_cnt) + ".txt", "w+") as f:
             self.__block_cnt += 1
             if self.positional:
                 for term in sorted(self.index):
@@ -65,7 +64,7 @@ class Indexer:
 
     def write_term_size_disk(self):
         logging.info("Writing # of postings for each term to disk")
-        with open(self.merge_directory + ".metadata/term_info.txt", "w+") as f:
+        with open(self.merge_dir + ".metadata/term_info.txt", "w+") as f:
             for term in sorted(self.term_info):
                 f.write(term + " " + " ".join(str(i)
                         for i in self.term_info[term]).strip() + "\n")
@@ -74,7 +73,7 @@ class Indexer:
         logging.info("Reading # of postings for each term to memory")
         self.term_info = {}
 
-        with open(self.merge_directory + ".metadata/term_info.txt", "r") as f:
+        with open(self.merge_dir + ".metadata/term_info.txt", "r") as f:
             for line in f:
                 term, *rest = line.strip().split(" ")
                 self.term_info[term] = [int(i) for i in rest]
@@ -82,25 +81,25 @@ class Indexer:
 
     def write_doc_ids(self):
 
-        if not self.doc_rename:
+        if not self.rename_doc:
             logging.warning(
                 "Doc rename is not in use. Cannot write doc ids to disk.")
             return
 
         # TODO: allow user to choose the file where it is going to be stored???
-        with open(self.merge_directory + ".metadata/doc_ids.txt", "w") as f:
+        with open(self.merge_dir + ".metadata/doc_ids.txt", "w") as f:
             for doc_id, doc in self.doc_ids.items():
                 f.write(doc_id + " " + doc + "\n")
 
     def read_doc_ids(self):
 
-        if not self.doc_rename:
+        if not self.rename_doc:
             logging.warning(
                 "Doc rename is not in use. Cannot write doc ids to disk.")
             return
 
         self.doc_ids = {}
-        with open(self.merge_directory + ".metadata/doc_ids.txt", "r") as f:
+        with open(self.merge_dir + ".metadata/doc_ids.txt", "r") as f:
             for line in f:
                 doc_id, doc = line.strip().split(" ")
                 self.doc_ids[doc_id] = doc
@@ -109,10 +108,9 @@ class Indexer:
     def read_posting_lists(self, term):
 
         # search for file
-        files = glob.glob(self.merge_directory + "/*.txt")
+        files = glob.glob(self.merge_dir + "/*.txt")
         term_file = None
         for f in files:
-            # FIXME: not sure
             f_terms = f.split("/")[-1].split(".txt")[0].split(" ")
             if term >= f_terms[0] and term <= f_terms[1]:
                 term_file = f
@@ -125,7 +123,7 @@ class Indexer:
                 term_location = 0
                 sorted_term_info = sorted(self.term_info.keys())
                 initial_term, final_term = term_file.split(
-                    "/")[-1].split(".txt")[0].split(" ")  # FIXME: not sure
+                    "/")[-1].split(".txt")[0].split(" ")
                 
                 # TODO: future work: binary search #
                 for j, v in enumerate(sorted_term_info):
@@ -168,7 +166,7 @@ class Indexer:
 
     def clear_blocks(self):
         logging.info("Removing unused blocks")
-        blocks = glob.glob(self.block_directory + "block*.txt")
+        blocks = glob.glob(self.block_dir + "block*.txt")
 
         for block in blocks:
             try:
@@ -176,7 +174,7 @@ class Indexer:
             except:
                 logging.error("Error removing block files")
 
-        os.rmdir(self.block_directory)
+        os.rmdir(self.block_dir)
 
     def open_file_to_index(self, filename):
 
@@ -204,13 +202,13 @@ class Indexer:
 
     def merge_block_disk(self):
 
-        if not os.path.exists(self.merge_directory):
-            os.mkdir(self.merge_directory)
-            os.mkdir(self.merge_directory + ".metadata/")
+        if not os.path.exists(self.merge_dir):
+            os.mkdir(self.merge_dir)
+            os.mkdir(self.merge_dir + ".metadata/")
 
         # opens every block file and stores the file pointers in a list
         blocks = [open(block, "r")
-                  for block in glob.glob(self.block_directory + "*")]
+                  for block in glob.glob(self.block_dir + "*")]
         terms = {}
         # keeps the last term for every block
         last_terms = [None for _ in range(len(blocks))]
@@ -246,12 +244,12 @@ class Indexer:
                 if term >= last_term:
                     break
                 total += len(terms[term])
-                if total >= self.merge_file_size_threshold:
+                if total >= self.merge_threshold:
                     break
 
-            if total >= self.merge_file_size_threshold:
+            if total >= self.merge_threshold:
                 # writes the terms to the file when the terms do not go pass a threshold
-                with self.open_merge_file(self.merge_directory + sorted_terms[0] + " " + term + ".txt") as f:
+                with self.open_merge_file(self.merge_dir + sorted_terms[0] + " " + term + ".txt") as f:
                     for ti, t in enumerate(sorted_terms):
                         if t <= term:
                             f.write(t + " " + " ".join(sorted(terms[t])) + "\n")
@@ -260,7 +258,7 @@ class Indexer:
                             del terms[t]
             elif not blocks:
                 # this will write the terms left in the last block
-                with self.open_merge_file(self.merge_directory + sorted_terms[0] + " " + term + ".txt") as f:
+                with self.open_merge_file(self.merge_dir + sorted_terms[0] + " " + term + ".txt") as f:
                     for ti, t in enumerate(sorted_terms):
                         f.write(t + " " + " ".join(sorted(terms[t])) + "\n")
                         if self.file_location and ti % self.file_location_step == 0:
@@ -272,7 +270,7 @@ class Indexer:
     def index_terms(self, terms, doc):
         # indexes a list of terms provided by the tokenizer
 
-        if self.doc_rename:
+        if self.rename_doc:
             doc_id = str(self.__doc_id_cnt)
             self.doc_ids[doc_id] = doc
             doc = doc_id
@@ -312,7 +310,7 @@ class Indexer:
 
             self.merge_block_disk()
             self.write_term_size_disk()
-            if self.doc_rename:
+            if self.rename_doc:
                 self.write_doc_ids()
 
             self.read_term_size_memory()

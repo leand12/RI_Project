@@ -11,22 +11,21 @@ def create_default_file(filename="config.json"):
             "positional": False,
             "load_zip": False,
             "save_zip": False,
-            "doc_rename": False,
+            "rename_doc": False,
             "file_location": False,
             "file_location_step": 100,
             "block_threshold": 1000000,
-            "merge_file_size_threshold": 5000,
+            "merge_threshold": 5000,
             "merge_chunk_size": 1000,
-            "block_directory":"./block/",
-            "merge_directory": "./indexer/",
+            "block_dir":"./block/",
+            "merge_dir": "./indexer/",
         }
-
         tokenizer = {
             "min_length":3,
             "case_folding":True,
             "no_numbers":True,
-            "stopwords":True,
-            "contractions":True,
+            "stopwords_file":True,
+            "contractions_file":True,
             "stemmer":True
         }
 

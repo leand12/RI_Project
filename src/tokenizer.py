@@ -4,25 +4,31 @@ import re
 # https://towardsdatascience.com/text-normalization-7ecc8e084e31
 # https://towardsdatascience.com/text-normalization-for-natural-language-processing-nlp-70a314bfa646
 
+
 class Review:
     ID = 2
     HEADLINE = 12
     BODY = 13
 
+
 class Tokenizer:
-    
-    def __init__(self, min_length=3, case_folding=True, no_numbers=True, stopwords=True, contractions=True, stemmer=True):
+
+    def __init__(self, case_folding=True, no_numbers=True, stemmer=True, min_length=3,
+                 stopwords_file="../data/nltk_en_stopwords.txt", 
+                 contractions_file="../data/en_contractions.txt"):
+
         self.min_length = min_length
         self.case_folding = case_folding
         self.no_numbers = no_numbers
         self.contractions = {}
         self.stopwords = set()
         self.stemmer = None
-        dirname, _ = os.path.split(os.path.abspath(__file__))
-        if stopwords:
-            self.stopwords = {w.lower() for w in open(dirname + "/../data/nltk_en_stopwords.txt", "r").read().split()}
-        if contractions:
-            for line in open(dirname + "/../data/en_contractions.txt", "r"):
+        path, _ = os.path.split(os.path.abspath(__file__))
+        if stopwords_file:
+            self.stopwords = {w.lower() for w in open(
+                path + "/" + stopwords_file, "r").read().split()}
+        if contractions_file:
+            for line in open(path + "/" + contractions_file, "r"):
                 token, term = line.lower().split(',')
                 self.contractions[token] = term
         if stemmer:
@@ -37,9 +43,11 @@ class Tokenizer:
         if self.stopwords:
             terms = [term for term in terms if term not in self.stopwords]
         if self.contractions:
-            terms = [term if term not in self.contractions else self.contractions[term] for term in terms]
+            terms = [term if term not in self.contractions else self.contractions[term]
+                     for term in terms]
         if self.no_numbers:
-            terms = [term for term in terms if not term.replace(',', '').replace('.', '').isdigit()]
+            terms = [term for term in terms if not term.replace(
+                ',', '').replace('.', '').isdigit()]
         if self.case_folding:
             terms = [term.casefold() for term in terms]
         if self.stemmer:
@@ -52,7 +60,7 @@ class Tokenizer:
         review = doc[Review.HEADLINE] + " " + doc[Review.BODY]
         review_id = doc[Review.ID]
 
-        #self.update_fields(doc)
+        # self.update_fields(doc)
         terms = []
         for pos, term in enumerate(self.normalize_tokens(review.split())):
             terms.append((term, str(pos)))
@@ -64,5 +72,3 @@ class Tokenizer:
 #t = Tokenizer()
 # ps_stem_sent = [ps.stem(words_sent) for words_sent in sent]
 # print(ps_stem_sent)
-
-
