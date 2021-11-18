@@ -1,4 +1,5 @@
 import logging
+import json
 import math
 import re
 import sys
@@ -74,14 +75,42 @@ class Indexer:
                         0] += len(self.index[term])
             self.index = {}
 
-    def write_term_size_disk(self):
+    def write_indexer_config(self):
+        logging.info("Writing indexer config to disk")
+        with open(self.merge_dir + ".metadata/config.json", "w") as f:
+
+            indexer = {
+                "positional": self.positional,
+                "save_zip":self.save_zip,
+                "rename_doc":self.rename_doc,
+                "file_location":self.file_location,
+                "file_location_step":self.file_location_step,
+                "block_threshold":self.block_threshold,
+                "merge_threshold":self.merge_threshold,
+                "merge_chunk_size":self.merge_chunk_size,
+                "block_dir":self.block_dir,
+                "merge_dir":self.merge_dir,
+            }
+            tokenizer = {
+                "min_length":self.tokenizer.min_length,
+                "case_folding":self.tokenizer.case_folding,
+                "no_numbers":self.tokenizer.no_numbers,
+                "stopwords_file":self.tokenizer.stopwords_file,
+                "contractions_file":self.tokenizer.contractions_file,
+                "stemmer":True if self.tokenizer.stemmer else False
+            }
+
+            data = {"indexer": indexer, "tokenizer": tokenizer}
+            j = json.dump(data, f, indent=2)
+
+    def write_term_info_disk(self):
         logging.info("Writing # of postings for each term to disk")
         with open(self.merge_dir + ".metadata/term_info.txt", "w+") as f:
             for term in sorted(self.term_info):
                 f.write(term + " " + " ".join(str(i)
                         for i in self.term_info[term]).strip() + "\n")
 
-    def read_term_size_memory(self):
+    def read_term_info_memory(self):
         logging.info("Reading # of postings for each term to memory")
         self.term_info = {}
 
@@ -173,7 +202,8 @@ class Indexer:
                         if term_r == term:
                             return postings
         else:
-            print("ta mal")
+            logging.error("An error occured when searching for the term:" + term)
+            exit(1)
 
     def clear_blocks(self):
         logging.info("Removing unused blocks")
@@ -322,8 +352,7 @@ class Indexer:
                 self.index_terms(terms, doc)
 
             self.merge_block_disk()
-            self.write_term_size_disk()
+            self.write_term_info_disk()
             if self.rename_doc:
                 self.write_doc_ids()
-
-            self.read_term_size_memory()
+            self.write_indexer_config()

@@ -24,6 +24,8 @@ class Tokenizer:
         self.stopwords = set()
         self.stemmer = None
         path, _ = os.path.split(os.path.abspath(__file__))
+        self.stopwords_file = stopwords_file
+        self.contractions_file = contractions_file
         if stopwords_file:
             self.stopwords = {w.lower() for w in open(
                 path + "/" + stopwords_file, "r").read().split()}
