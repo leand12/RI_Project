@@ -1,3 +1,6 @@
+# Bruno Bastos 93446
+# Leandro Silva 93446
+
 import logging
 
 class Query:
@@ -19,6 +22,8 @@ class Query:
         print(terms)
         temp = {}
 
+        return
+        # TODO: no finished yet
         while len(terms) > 1:
             terms.sort(key=lambda x: -x[1])
             t1, s1 = terms.pop()

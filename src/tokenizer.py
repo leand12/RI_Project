@@ -1,3 +1,6 @@
+# Bruno Bastos 93446
+# Leandro Silva 93446
+
 from nltk.stem import SnowballStemmer
 import os
 import re
@@ -35,6 +38,8 @@ class Tokenizer:
             self.stemmer = SnowballStemmer("english")
 
     def normalize_tokens(self, terms):
+        """Transform a list of tokens in terms."""
+
         terms = [re.sub(r'[^a-zA-Z0-9]', ' ', term).split() for term in terms]
         terms = [term for subterms in terms for term in subterms if len(term) <= self.max_length]
 
@@ -56,6 +61,8 @@ class Tokenizer:
         return terms
 
     def tokenize(self, line):
+        """Tokenize a document and return the terms position."""
+
         doc = line.split('\t')
         review = doc[Review.HEADLINE] + " " + doc[Review.BODY]
         review_id = doc[Review.ID]
@@ -64,11 +71,5 @@ class Tokenizer:
         terms = []
         for pos, term in enumerate(self.normalize_tokens(review.split())):
             terms.append((term, str(pos)))
-        # { token: { doc1: p1, p2} }
-        # FIXME: change the return value
-        # it is only like this to match the indexer
+        
         return terms, review_id
-
-#t = Tokenizer()
-# ps_stem_sent = [ps.stem(words_sent) for words_sent in sent]
-# print(ps_stem_sent)

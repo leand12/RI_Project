@@ -1,3 +1,6 @@
+# Bruno Bastos 93446
+# Leandro Silva 93446
+
 import os
 import logging
 import coloredlogs
@@ -33,37 +36,37 @@ group1 = parser.add_argument_group('indexer optional arguments')
 group1.add_argument('--positional', action='store_true',
                     help='save the terms\' positions in a document')
 group1.add_argument('--save-zip', action='store_true',
-                    help='')
+                    help='zip the output files of the indexer')
 group1.add_argument('--doc-rename', action='store_true',
-                    help='')
+                    help='rename document IDs for a more efficient space usage')
 group1.add_argument('--file-location', action='store_true',
                     help='')
 group1.add_argument('--file-location-step', metavar='STEP', type=int, default=100,
                     help='')
 group1.add_argument('--block-threshold', metavar='THRESHOLD', type=int, default=1_000_000,
-                    help='')
+                    help='maximum number of documents that can be stored in a block (default: %(default)s)')
 group1.add_argument('--merge-threshold', metavar='THRESHOLD', type=int, default=1_000_000,
-                    help='')
+                    help='maximum number of documents that can be stored in a index (default: %(default)s)')
 group1.add_argument('--merge-chunk-size', metavar='SIZE', type=int, default=1000,
-                    help='')
+                    help='size of the block chunks read (default: %(default)s)')
 group1.add_argument('--block-dir', metavar='DIR', default="block/",
-                    help='')
+                    help='source directory path to store the blocks (default: %(default)s)')
 group1.add_argument('--merge-dir', metavar='DIR', default="indexer/",
-                    help='')
+                    help='source directory path to store the indexer (default: %(default)s)')
 
 group2 = parser.add_argument_group('tokenizer optional arguments')
 group2.add_argument('--case-folding', action='store_true',
-                    help='')
+                    help='convert every token to lowercase')
 group2.add_argument('--no-numbers', action='store_true',
-                    help='')
+                    help='remove tokens with only numbers')
 group2.add_argument('--stemmer', action='store_true',
-                    help='')
+                    help='stemmerize the tokens')
 group2.add_argument('--min-length', metavar='LENGTH', type=int, default=3,
-                    help='')
+                    help='remove tokens with lower minimum length (default: %(default)s)')
 group2.add_argument('--stopwords-file', metavar='FILE', default="../data/nltk_en_stopwords.txt",
-                    help='')
+                    help='remove tokens from a stopwords file (default: %(default)s)')
 group2.add_argument('--contractions-file', metavar='FILE', default="../data/en_contractions.txt",
-                    help='')
+                    help='replace tokens from a contractions file (default: %(default)s)')
 
 args = vars(parser.parse_args())
 
@@ -86,8 +89,6 @@ if __name__ == "__main__":
     logging.info(
         f"Time taken to start up index: {timer() - start:.2f} seconds")
 
-    exit()
-
     query = Query(indexer)
 
     search = input("Search: ")
@@ -95,8 +96,11 @@ if __name__ == "__main__":
     start = timer()
     results = query.search(search)
 
+    # TODO: not finished yet
+    """
     if results:
         logging.info(
             f"{len(results)} results ({timer() - start:.2f} seconds)")
     else:
         logging.info(f"Your search - {search} - did not match any documents")
+    """

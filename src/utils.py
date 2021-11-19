@@ -1,3 +1,6 @@
+# Bruno Bastos 93446
+# Leandro Silva 93446
+
 import os
 import math
 

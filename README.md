@@ -1,11 +1,21 @@
 
 
-# RI Project 
+# RI Project <!-- omit in toc -->
+## Authors <!-- omit in toc -->
 
-## Authors
+[Bruno Bastos](https://github.com/BrunosBastos)\
+[Leandro Silva](https://github.com/leand12)
 
-Bruno Bastos\
-Leandro Silva
+
+## Table of Contents <!-- omit in toc -->
+- [How it works](#how-it-works)
+  - [Tokenizer](#tokenizer)
+  - [Indexer](#indexer)
+- [Results](#results)
+- [How to run](#how-to-run)
+  - [Indexer](#indexer-1)
+  - [Tokenizer](#tokenizer-1)
+
 
 
 ## How it works
@@ -52,110 +62,128 @@ Finally, the indexer needs to save its configuration for it to load whenever it 
  
  ## Results
 
+There were conducted some experiments with different configurations in order to see their tradeoffs and benefits. This table shows for each experiment the configurations that were used.
 
+
+| Experiment | positional               | save_zip                 | rename_doc               | case_folding             | no_numbers               | stopwords                | contractions             | stemmer                  |
+| ---------- | ------------------------ | ------------------------ | ------------------------ | ------------------------ | ------------------------ | ------------------------ | ------------------------ | ------------------------ |
+| config    | :heavy_multiplication_x: | :heavy_check_mark: | :heavy_multiplication_x: | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_multiplication_x: |
+| config 0   | :heavy_multiplication_x: | :heavy_multiplication_x: | :heavy_multiplication_x: | :heavy_multiplication_x: | :heavy_multiplication_x: | :heavy_multiplication_x: | :heavy_multiplication_x: | :heavy_multiplication_x: |
+| config 1   | :heavy_multiplication_x: | :heavy_multiplication_x: | :heavy_multiplication_x: | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_multiplication_x: |
+| config 2   | :heavy_multiplication_x: | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       |
+| config 3   | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       |
+| config 4   | :heavy_multiplication_x: | :heavy_multiplication_x: | :heavy_multiplication_x: | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       |
+| config 5   | :heavy_multiplication_x: | :heavy_multiplication_x:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       | :heavy_check_mark:       |
+
+The experiments in this table used the dataset: amazon_reviews_us_Digital_Video_Games_v1_00.tsv.gz (26.2 MB), after it was unzipped.
+
+| Experiment | Indexing Time | Vocabulary Size | Index Size on Disk | # of Index segments | Start up Time |
+| ---------- | ------------- | --------------- | ------------------ | ------------------- | ------------- |
+| config     | 25.80s        | 70449           |36.88MB            | 6                   | 0.12s         |
+| config 0   | 22.39s        | 95447           | 80.36MB            | 8                   | 0.19s         |
+| config 1   | 20.94s        | 70449           | 59.69MB            | 6                   | 0.12s         |
+| config 2   | 79.72s        | 49352           | 13.80MB            | 6                   | 0.17s         |
+| config 3   | 92.92s        | 49352           | 20.76MB            | 6                   | 0.19s         |
+| config 4   | 76.86s        | 49352           | 56.68MB            | 6                   | 0.07s         |
+| config 5   | 79.50s        | 49352           | 28.04MB            | 6                   | 0.16s         |
+
+
+Analysing the results we can see that using the stemmer decreases the vocabulary size, as there are more different tokens that are transformed in equal terms. However, this is paid off with a higher indexing time.
+
+The positional approach stores more information to show the exact location of a token in a document, and for that it is reasonable to say that it takes more indexing time and space on disk.
+
+Finally, when compressing the index files, we can see that the space taken on disk is reduced considerably without affecting too much in the start up time.
+
+
+| Experiment | Indexing Time | Vocabulary Size | Index Size on Disk | # of Index segments | Start up Time |
+| ---------- | ------------- | --------------- | ------------------ | ------------------- | ------------- |
+| dataset 1    | 25.80s        | 70449           |36.88MB            | 6                   | 0.12s         |
+| dataset 2    | 352.55 s      | 330932          | 306.86MB           | 9                   | 0.71s         |
+| dataset 3    | 2325.17s      | 1133238         | 1.95GB             | 15                  | 1.67s         |
+| dataset 4    | 4521.89s      | 1330785         | 4.10GB             | 25                   | 2.54s         |
+
+For all the datasets it was use the first config file in the first table. The thresholds for the blocks to be written to disk were changed based on the size of the file. So, the size of a block on the first dataset is much smaller than the size of a block in the last dataset. 
 
 ## How to run
 
-The indexer and tokinizer provide the user a range of different options to customize the way they work. Files can be runned providing the desired parameters via terminal or by using a configuration file.
+The indexer and tokinizer provide the user a range of different options to customize the way they work. Files can be runned providing the desired parameters via terminal or by using a configuration file. 
+Note: if the provided dataset file is a `.gz` file it will unzip it as it reads.
 
+Examples:
+
+- To create an indexer, and optionally with some arguments, use:
+
+```
+python3 main.py -d ../dataset [OPTIONS ...]
+```
+where ../dataset is the path of the dataset.
+
+- To create an indexer with a config file use:
+
+```
+python3 main.py -d ../dataset -c config.json 
+```
+where config.json is the path of the config file.
+
+
+- To run a pre-created indexer, use:
+
+```
+python3 main.py -i indexer/
+```
+where indexer/ is the path to the created indexer folder.
 ### Indexer
 
 The indexer has a few options:
 
---positional
-```
-    -p 
-```
+`--positional`\
 when provided, saves the terms' positions in a document. This increases the required RAM and disk space, but can give better results when searching for a phrase.
 
---save-zip
-```
+`--save-zip`\
+when provided, the output files of the indexer will be zipped. This saves disk space in exchange for a slower read whenever a user is making a query.
 
-```
-when provided, the output files of the indexer while be zipped. This saves disk space in exchange for a slower read whenever a user is making a query.
-
---rename-doc
-```
-
-```
-when provided, the documents will be renamed as a integer which occupies less bytes to store. For smaller number of documents, this will decrease the space required to store the indexer, but in exchange, will consume a bit more space in RAM. For larger number of documents, it will not work, as it will end up needing more space to store a single document.
+`--rename-doc`\
+when provided, the documents will be renamed as an integer which occupies less bytes to store. For smaller number of documents, this will decrease the space required to store the indexer, but in exchange, will consume a bit more space in RAM. For larger number of documents, it will not work, as it will end up needing more space to store a single document.
 
 
--file-location
-```
-
-```
+`--file-location`\
 with this flag activated, the location of a term in a file will be stored in memory and later send to disk. This will increase the speed at which the indexer accesses a certain term, but will need more disk storage and RAM. 
 
 
---file-location-step
-```
-
-```
+`--file-location-step STEP`\
 the step corresponds to the number of terms that are skipped in order to save the next file position. A bigger step will result in a slower search but decreases the disk space required to save the positions. A step of 1 keeps the position for every term in the corresponding file.
 
---block-threshold
-```
-
-```
+`--block-threshold THRESHOLD`\
 corresponds to the maximum number of documents that can be stored in a block. A smaller value will result in more files, slowing down the merge and takes more time writting to disk. While if a higher value is choosed, the indexer can run out of RAM.
 
---merge-threshold
-```
-
-```
+`--merge-threshold THRESHOLD`\
 corresponds to the maximum number of postings for a merged file in disk. The higher the value, lesser files will be created, but can slow down search as there are bigger files to look for the terms.
 
---block-dir
-```
-
-```
+`--block-dir DIR`\
 the temporary directory where the blocks will be stored. After the merge the blocks and this directory are deleted.
 
---merge-dir
-```
-
-```
+`--merge-dir DIR`\
 the final directory where the indexer is stored. This directory should contain a ".metadata" directory containing the necessary metadata files required for the indexer to be loaded.
 
 
 ### Tokenizer
 
---case-folding
-```
-
-```
-chooses whether or not to convert every token to lowercase.
-
---no-numbers
-```
-
-```
-discards every token that is a number.
-
-
 The tokenizer parameters will decide how the tokens are processed.
 
---stemmer
-```
+`--case-folding`\
+chooses whether or not to convert every token to lowercase.
 
-```
+`--no-numbers`\
+discards every token that is a number.
+
+`--stemmer`\
 makes use of the Snowball stemmer for english words.
 
---min-length
-```
-
-```
+`--min-length LENGTH`\
 only tokens with size greater or equal to the minimum length value are accounted.
 
---stopwords-file
-```
-
-```
+`--stopwords-file FILE`\
 discards every word that is contained in the stopwords file.
 
---contractions-file
-```
-
-```
+`--contractions-file FILE`\
 uses a contraction file that has many english contractions. If a token matches one of the contractions it is converted in the non contracted list of tokens.

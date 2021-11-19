@@ -1,3 +1,6 @@
+# Bruno Bastos 93446
+# Leandro Silva 93446
+
 import logging
 import json
 import math
@@ -55,6 +58,8 @@ class Indexer:
 
     @staticmethod
     def load_metadata(directory):
+        """Static method that creates an Indexer object from a directory using the metadata."""
+
         indexer = Indexer.read_config(directory + ".metadata/config.json")
         indexer.read_term_info_memory()
         if indexer.rename_doc:
@@ -64,6 +69,7 @@ class Indexer:
 
     @staticmethod
     def read_config(filename):
+        """Static method that creates an Indexer object by providing a config file."""
 
         with open(filename, "r") as f:
             data = json.loads(f.read())
@@ -85,6 +91,7 @@ class Indexer:
 
     @staticmethod
     def create_default_file(filename="config.json"):
+        """Static method that creates a configuration file with the default configurations."""
 
         with open(filename, "w") as f:
             indexer = {
@@ -111,14 +118,19 @@ class Indexer:
             j = json.dump(data, f, indent=2)
 
     def write_block_disk(self):
+        """Writes the current block to disk."""
 
         if not os.path.exists(self.block_dir):
             os.mkdir(self.block_dir)
+ 
+        # resets the number of postings in memory
         self.__post_cnt = 0
-        # writes the current indexer block to disk
+
+
         with open(self.block_dir + "block" + str(self.__block_cnt) + ".txt", "w+") as f:
             self.__block_cnt += 1
             if self.positional:
+                # term doc1,pos1,pos2 doc2,pos1
                 for term in sorted(self.index):
                     f.write(term + " " + " ".join([
                         doc + "," + ",".join(self.index[term][doc]) for doc in self.index[term]
@@ -126,6 +138,7 @@ class Indexer:
                     self.term_info.setdefault(term, [0, ''])[
                         0] += len(self.index[term])
             else:
+                # term doc1 doc2
                 for term in sorted(self.index):
                     f.write(term + " " + " ".join(self.index[term]) + "\n")
                     self.term_info.setdefault(term, [0, ''])[
@@ -133,6 +146,8 @@ class Indexer:
             self.index = {}
 
     def write_indexer_config(self):
+        """Saves the current configuration as metadata."""
+
         logging.info("Writing indexer config to disk")
         with open(self.merge_dir + ".metadata/config.json", "w") as f:
 
@@ -161,13 +176,19 @@ class Indexer:
             j = json.dump(data, f, indent=2)
 
     def write_term_info_disk(self):
+        """Saves term information as metadata."""
+
         logging.info("Writing # of postings for each term to disk")
         with open(self.merge_dir + ".metadata/term_info.txt", "w+") as f:
+
+            # term posting_size file_location
             for term in sorted(self.term_info):
                 f.write(term + " " + " ".join(str(i)
                         for i in self.term_info[term]).strip() + "\n")
 
     def read_term_info_memory(self):
+        """Reads term information from metadata."""
+
         logging.info("Reading # of postings for each term to memory")
         self.term_info = {}
 
@@ -177,18 +198,19 @@ class Indexer:
                 self.term_info[term] = [int(i) for i in rest]
 
     def write_doc_ids(self):
+        """Saves the dict containing the new ids for the documents as metadata."""
 
         if not self.rename_doc:
             logging.warning(
                 "Doc rename is not in use. Cannot write doc ids to disk.")
             return
 
-        # TODO: allow user to choose the file where it is going to be stored???
         with open(self.merge_dir + ".metadata/doc_ids.txt", "w") as f:
             for doc_id, doc in self.doc_ids.items():
                 f.write(doc_id + " " + doc + "\n")
 
     def read_doc_ids(self):
+        """Reads document id conversion from metadata."""
 
         if not self.rename_doc:
             logging.warning(
@@ -202,9 +224,8 @@ class Indexer:
                 self.doc_ids[doc_id] = doc
         self.__doc_id_cnt = len(self.doc_ids)
 
-    
-
     def read_posting_lists(self, term):
+        """Reads the posting list of a term from disk."""
 
         # search for file
         files = glob.glob(self.merge_dir + "/*.txt")
@@ -266,6 +287,8 @@ class Indexer:
             exit(1)
 
     def clear_blocks(self):
+        """Remove blocks folder."""
+
         logging.info("Removing unused blocks")
         blocks = glob.glob(self.block_dir + "block*.txt")
 
@@ -278,6 +301,7 @@ class Indexer:
         os.rmdir(self.block_dir)
 
     def open_file_to_index(self, filename):
+        """Open and return the dataset file."""
 
         try:
             f = open(filename, "r")
@@ -297,6 +321,7 @@ class Indexer:
         exit(1)
 
     def open_merge_file(self, filename):
+        """Open and return a index file."""
 
         if self.save_zip:
             f = gzip.open(filename + ".gz", "wt")
@@ -305,7 +330,8 @@ class Indexer:
         return f
 
     def merge_block_disk(self):
-
+        """Merge all blocks in disk."""
+        
         if not os.path.exists(self.merge_dir):
             os.mkdir(self.merge_dir)
             os.mkdir(self.merge_dir + ".metadata/")
@@ -373,6 +399,12 @@ class Indexer:
         self.clear_blocks()
 
     def index_terms(self, terms, doc):
+        """
+        Index a list of terms provided by the tokenizer.
+
+        @param terms: the list of terms
+        @param doc: the document ID
+        """
         # indexes a list of terms provided by the tokenizer
 
         if self.rename_doc:
@@ -400,7 +432,11 @@ class Indexer:
         self.__post_cnt += len(terms)
 
     def index_file(self, filename):
+        """
+        Create the indexer for a dataset.
 
+        @param filename: the dataset filename
+        """
         with self.open_file_to_index(filename) as f:
             while f:
                 line = f.readline()
