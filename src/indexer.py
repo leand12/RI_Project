@@ -145,6 +145,11 @@ class Indexer:
                 self.doc_ids[doc_id] = doc
         self.__doc_id_cnt = len(self.doc_ids)
 
+    def load_metadata(self):
+        self.read_term_info_memory()
+        if self.rename_doc:
+            self.read_doc_ids()
+
     def read_posting_lists(self, term):
 
         # search for file

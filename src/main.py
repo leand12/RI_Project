@@ -6,7 +6,7 @@ from tokenizer import Tokenizer
 from indexer import Indexer
 from query import Query
 from timeit import default_timer as timer
-
+from config import read_config
 
 logger = logging.getLogger(__name__)  # get a specific logger object
 coloredlogs.install(level='DEBUG')  # install a handler on the root logger with level debug
@@ -66,15 +66,20 @@ group2.add_argument('--contractions-file', metavar='FILE', default="../data/en_c
 args = vars(parser.parse_args())
 
 if __name__ == "__main__":
-    tokenizer = Tokenizer(**args)
-    indexer = Indexer(**args)
-
+    #tokenizer = Tokenizer(**args)
+    #indexer = Indexer(**args)
+    indexer = read_config("config.json")
     start = timer()
     indexer.index_file(args["dataset"])
     logging.info(f"Finished indexing ({timer() - start:.2f} seconds)")
     logging.info(f"Vocabulary size: {indexer.vocabulary_size}")
     logging.info(f"Index size on disk: {indexer.disk_size}")
     logging.info(f"Index segments written to disk: {indexer.num_segments}")
+
+    start = timer()
+    indexer = read_config("./indexer/.metadata/config.json")
+    indexer.load_metadata()
+    logging.info(f"Time taken to start up index: {timer() - start:.2f} seconds")
 
     exit()
 
