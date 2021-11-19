@@ -6,11 +6,10 @@ from tokenizer import Tokenizer
 from indexer import Indexer
 from query import Query
 from timeit import default_timer as timer
-from config import read_config
 
-logger = logging.getLogger(__name__)  # get a specific logger object
-coloredlogs.install(level='DEBUG')  # install a handler on the root logger with level debug
-coloredlogs.install(level='DEBUG', logger=logger)  # pass a specific logger object
+logger = logging.getLogger(__name__)
+coloredlogs.install(level='DEBUG')
+coloredlogs.install(level='DEBUG', logger=logger)
 coloredlogs.install(
     level='DEBUG', logger=logger, datefmt='%H:%M:%S',
     fmt='\33[1m\33[34m%(filename)s:%(lineno)d %(asctime)s\33[0m - %(message)s'
@@ -26,6 +25,9 @@ group.add_argument('-d', '--dataset', metavar='FILE',
                    help='file with the documents to index')
 group.add_argument('-i', '--indexer', metavar='DIR',
                    help='source directory of a indexer')
+
+parser.add_argument('-c', '--config', metavar='FILE',
+                    help='json file with the configurations to build the tokenizer and indexer')
 
 group1 = parser.add_argument_group('indexer optional arguments')
 group1.add_argument('--positional', action='store_true',
@@ -66,9 +68,12 @@ group2.add_argument('--contractions-file', metavar='FILE', default="../data/en_c
 args = vars(parser.parse_args())
 
 if __name__ == "__main__":
-    #tokenizer = Tokenizer(**args)
-    #indexer = Indexer(**args)
-    indexer = read_config("config.json")
+    if args["config"]:
+        indexer = Indexer.read_config(args["config"])
+    else:
+        tokenizer = Tokenizer(**args)
+        indexer = Indexer(tokenizer=tokenizer, **args)
+
     start = timer()
     indexer.index_file(args["dataset"])
     logging.info(f"Finished indexing ({timer() - start:.2f} seconds)")
@@ -77,9 +82,9 @@ if __name__ == "__main__":
     logging.info(f"Index segments written to disk: {indexer.num_segments}")
 
     start = timer()
-    indexer = read_config("./indexer/.metadata/config.json")
-    indexer.load_metadata()
-    logging.info(f"Time taken to start up index: {timer() - start:.2f} seconds")
+    indexer = Indexer.load_metadata("./indexer/")
+    logging.info(
+        f"Time taken to start up index: {timer() - start:.2f} seconds")
 
     exit()
 
@@ -95,10 +100,3 @@ if __name__ == "__main__":
             f"{len(results)} results ({timer() - start:.2f} seconds)")
     else:
         logging.info(f"Your search - {search} - did not match any documents")
-
-
-"""
-
-index para os ficheiros gerados, com steps e usar binary search
-
-"""

@@ -1,14 +1,11 @@
 from nltk.stem import SnowballStemmer
 import os
 import re
-# https://towardsdatascience.com/text-normalization-7ecc8e084e31
-# https://towardsdatascience.com/text-normalization-for-natural-language-processing-nlp-70a314bfa646
-
 
 class Review:
     ID = 2
-    HEADLINE = 12
-    BODY = 13
+    HEADLINE = -3
+    BODY = -2
 
 
 class Tokenizer:
@@ -18,6 +15,7 @@ class Tokenizer:
                  contractions_file="../data/en_contractions.txt", **ignore):
 
         self.min_length = min_length
+        self.max_length = 123
         self.case_folding = case_folding
         self.no_numbers = no_numbers
         self.contractions = {}
@@ -38,7 +36,7 @@ class Tokenizer:
 
     def normalize_tokens(self, terms):
         terms = [re.sub(r'[^a-zA-Z0-9]', ' ', term).split() for term in terms]
-        terms = [term for subterms in terms for term in subterms]
+        terms = [term for subterms in terms for term in subterms if len(term) <= self.max_length]
 
         if self.min_length:
             terms = [term for term in terms if len(term) >= self.min_length]

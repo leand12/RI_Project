@@ -9,6 +9,7 @@ import gzip
 from tokenizer import Tokenizer
 from utils import convert_size, get_directory_size
 
+
 class Indexer:
 
     def __init__(self, tokenizer=Tokenizer(), positional=False, save_zip=False, rename_doc=False,
@@ -20,11 +21,10 @@ class Indexer:
         self.index = {}
         self.term_info = {}     # keeps the number of postings of a term
         path, _ = os.path.split(os.path.abspath(__file__))
-        self.block_dir = path + "/" + block_dir
-        self.merge_dir = path + "/" + merge_dir
+        self.block_dir = block_dir if os.path.isabs(block_dir) else path + "/" + block_dir
+        self.merge_dir = merge_dir if os.path.isabs(merge_dir) else path + "/" + merge_dir
 
         self.__block_cnt = 0
-        # TODO: change this value or let it be set by the user
         self.block_threshold = block_threshold
         self.merge_threshold = merge_threshold
         self.merge_chunk_size = merge_chunk_size
@@ -52,6 +52,63 @@ class Indexer:
     @property
     def disk_size(self):
         return convert_size(get_directory_size(self.merge_dir))
+
+    @staticmethod
+    def load_metadata(directory):
+        indexer = Indexer.read_config(directory + ".metadata/config.json")
+        indexer.read_term_info_memory()
+        if indexer.rename_doc:
+            indexer.read_doc_ids()
+
+        return indexer
+
+    @staticmethod
+    def read_config(filename):
+
+        with open(filename, "r") as f:
+            data = json.loads(f.read())
+
+            indexer_data = data.get("indexer")
+            tokenizer_data = data.get("tokenizer")
+
+            if tokenizer_data:
+                tokenizer = Tokenizer(**tokenizer_data)
+            else:
+                tokenizer = Tokenizer()
+
+            if indexer_data:
+                indexer = Indexer(tokenizer=tokenizer, **indexer_data)
+            else:
+                indexer = Indexer(tokenizer=tokenizer)
+
+            return indexer
+
+    @staticmethod
+    def create_default_file(filename="config.json"):
+
+        with open(filename, "w") as f:
+            indexer = {
+                "positional": False,
+                "save_zip": False,
+                "rename_doc": False,
+                "file_location": False,
+                "file_location_step": 100,
+                "block_threshold": 1_000_000,
+                "merge_threshold": 1_000_000,
+                "merge_chunk_size": 1000,
+                "block_dir": "block/",
+                "merge_dir": "indexer/",
+            }
+            tokenizer = {
+                "min_length": 3,
+                "case_folding": True,
+                "no_numbers": True,
+                "stopwords_file": None,
+                "contractions_file": None,
+                "stemmer": True
+            }
+            data = {"indexer": indexer, "tokenizer": tokenizer}
+            j = json.dump(data, f, indent=2)
 
     def write_block_disk(self):
 
@@ -81,23 +138,23 @@ class Indexer:
 
             indexer = {
                 "positional": self.positional,
-                "save_zip":self.save_zip,
-                "rename_doc":self.rename_doc,
-                "file_location":self.file_location,
-                "file_location_step":self.file_location_step,
-                "block_threshold":self.block_threshold,
-                "merge_threshold":self.merge_threshold,
-                "merge_chunk_size":self.merge_chunk_size,
-                "block_dir":self.block_dir,
-                "merge_dir":self.merge_dir,
+                "save_zip": self.save_zip,
+                "rename_doc": self.rename_doc,
+                "file_location": self.file_location,
+                "file_location_step": self.file_location_step,
+                "block_threshold": self.block_threshold,
+                "merge_threshold": self.merge_threshold,
+                "merge_chunk_size": self.merge_chunk_size,
+                "block_dir": self.block_dir,
+                "merge_dir": self.merge_dir,
             }
             tokenizer = {
-                "min_length":self.tokenizer.min_length,
-                "case_folding":self.tokenizer.case_folding,
-                "no_numbers":self.tokenizer.no_numbers,
-                "stopwords_file":self.tokenizer.stopwords_file,
-                "contractions_file":self.tokenizer.contractions_file,
-                "stemmer":True if self.tokenizer.stemmer else False
+                "min_length": self.tokenizer.min_length,
+                "case_folding": self.tokenizer.case_folding,
+                "no_numbers": self.tokenizer.no_numbers,
+                "stopwords_file": self.tokenizer.stopwords_file,
+                "contractions_file": self.tokenizer.contractions_file,
+                "stemmer": True if self.tokenizer.stemmer else False
             }
 
             data = {"indexer": indexer, "tokenizer": tokenizer}
@@ -145,10 +202,7 @@ class Indexer:
                 self.doc_ids[doc_id] = doc
         self.__doc_id_cnt = len(self.doc_ids)
 
-    def load_metadata(self):
-        self.read_term_info_memory()
-        if self.rename_doc:
-            self.read_doc_ids()
+    
 
     def read_posting_lists(self, term):
 
@@ -207,7 +261,8 @@ class Indexer:
                         if term_r == term:
                             return postings
         else:
-            logging.error("An error occured when searching for the term:" + term)
+            logging.error(
+                "An error occured when searching for the term:" + term)
             exit(1)
 
     def clear_blocks(self):
@@ -224,20 +279,22 @@ class Indexer:
 
     def open_file_to_index(self, filename):
 
-        if filename.endswith(".gz"):
-            try:
-                f = gzip.open(filename, "rt")
-            except gzip.BadGzipFile:
-                logging.error(
-                    "The provided file is not compatible with gzip format")
-                exit(1)
-        else:
-            try:
-                f = open(filename, "r")
-            except:
-                logging.error("Could not open the provided file")
-                exit(1)
-        return f
+        try:
+            f = open(filename, "r")
+            f.readline()  # skip header
+            return f
+        except:
+            pass
+
+        try:
+            f = gzip.open(filename, "rt")
+            f.readline()  # skip header
+            return f
+        except gzip.BadGzipFile:
+            pass
+
+        logging.error("Could not open the provided file")
+        exit(1)
 
     def open_merge_file(self, filename):
 
@@ -342,11 +399,9 @@ class Indexer:
                 self.index[term].append(doc)
         self.__post_cnt += len(terms)
 
-    def index_file(self, filename, skip_lines=1):
+    def index_file(self, filename):
 
         with self.open_file_to_index(filename) as f:
-            for _ in range(skip_lines):
-                f.readline()
             while f:
                 line = f.readline()
 
