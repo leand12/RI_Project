@@ -221,20 +221,22 @@ class Indexer:
 
     def open_file_to_index(self, filename):
 
-        if filename.endswith(".gz"):
-            try:
-                f = gzip.open(filename, "rt")
-            except gzip.BadGzipFile:
-                logging.error(
-                    "The provided file is not compatible with gzip format")
-                exit(1)
-        else:
-            try:
-                f = open(filename, "r")
-            except:
-                logging.error("Could not open the provided file")
-                exit(1)
-        return f
+        try:
+            f = open(filename, "r")
+            f.readline()  # skip header
+            return f
+        except:
+            pass
+
+        try:
+            f = gzip.open(filename, "rt")
+            f.readline()  # skip header
+            return f
+        except gzip.BadGzipFile:
+            pass
+
+        logging.error("Could not open the provided file")
+        exit(1)
 
     def open_merge_file(self, filename):
 
@@ -339,11 +341,9 @@ class Indexer:
                 self.index[term].append(doc)
         self.__post_cnt += len(terms)
 
-    def index_file(self, filename, skip_lines=1):
+    def index_file(self, filename):
 
         with self.open_file_to_index(filename) as f:
-            for _ in range(skip_lines):
-                f.readline()
             while f:
                 line = f.readline()
 
