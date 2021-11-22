@@ -24,8 +24,10 @@ class Indexer:
         self.index = {}
         self.term_info = {}     # keeps the number of postings of a term
         path, _ = os.path.split(os.path.abspath(__file__))
-        self.block_dir = block_dir if os.path.isabs(block_dir) else path + "/" + block_dir
-        self.merge_dir = merge_dir if os.path.isabs(merge_dir) else path + "/" + merge_dir
+        self.block_dir = block_dir if os.path.isabs(
+            block_dir) else path + "/" + block_dir
+        self.merge_dir = merge_dir if os.path.isabs(
+            merge_dir) else path + "/" + merge_dir
 
         self.__block_cnt = 0
         self.block_threshold = block_threshold
@@ -122,10 +124,9 @@ class Indexer:
 
         if not os.path.exists(self.block_dir):
             os.mkdir(self.block_dir)
- 
+
         # resets the number of postings in memory
         self.__post_cnt = 0
-
 
         with open(self.block_dir + "block" + str(self.__block_cnt) + ".txt", "w+") as f:
             self.__block_cnt += 1
@@ -195,7 +196,7 @@ class Indexer:
         with open(self.merge_dir + ".metadata/term_info.txt", "r") as f:
             for line in f:
                 term, *rest = line.strip().split(" ")
-                self.term_info[term] = [int(i) for i in rest]
+                self.term_info[term] = [int(i) for i in rest] + ([''] if len(rest) < 2 else [])
 
     def write_doc_ids(self):
         """Saves the dict containing the new ids for the documents as metadata."""
@@ -228,10 +229,10 @@ class Indexer:
         """Reads the posting list of a term from disk."""
 
         # search for file
-        files = glob.glob(self.merge_dir + "/*.txt")
+        files = glob.glob(self.merge_dir + "/*.txt*")
         term_file = None
         for f in files:
-            f_terms = f.split("/")[-1].split(".txt")[0].split(" ")
+            f_terms = f.split("/")[-1].replace(".gz", "").split(".txt")[0].split(" ")
             if term >= f_terms[0] and term <= f_terms[1]:
                 term_file = f
                 break
@@ -243,34 +244,43 @@ class Indexer:
                 term_location = 0
                 sorted_term_info = sorted(self.term_info.keys())
                 initial_term, final_term = term_file.split(
-                    "/")[-1].split(".txt")[0].split(" ")
+                    "/")[-1].replace(".gz", "").split(".txt")[0].split(" ")
 
-                # TODO: future work: binary search #
-                for j, v in enumerate(sorted_term_info):
-                    if v == initial_term:
+                low = index = 0
+                high = len(sorted_term_info) - 1
+
+                while low <= high:
+                    index = (high + low) // 2
+                    if sorted_term_info[index] < term:
+                        low = index + 1
+                    elif sorted_term_info[index] > term:
+                        high = index - 1
+                    else:
+                        break
+                
+                for i in range(self.file_location_step):
+                    if self.term_info[sorted_term_info[index-i]][1]:
+                        # previous term has file location
+                        term_location = self.term_info[sorted_term_info[index-i]][1] + i
                         break
 
-                for i in range(j, len(sorted_term_info), self.file_location_step):
-                    if sorted_term_info[i] <= term and sorted_term_info[i + self.file_location_step] > term:
-                        term_location = i - j
-                        break
-                ##
-
-                with open(term_file, "r") as f:
-                    for i in range(term_location):
+                with self.open_merge_file(term_file.replace(".gz", ""), "r") as f:
+                    for i in range(term_location - 1):
                         f.readline()
 
-                    while True:
+                    while (line := f.readline()):
+
                         if self.positional:
-                            term_r, *postings = f.readline().strip().split(" ")
+                            term_r, *postings = line.strip().split(" ")
                             postings = [pos.split(',')[0] for pos in postings]
                         else:
-                            term_r, *postings = f.readline().strip().split(" ")
+                            term_r, *postings = line.strip().split(" ")
 
                         if term == term_r:
                             return postings
+                    assert False, "Should find a term"
             else:
-                with open(term_file, "r") as f:
+                with self.open_merge_file(term_file.replace(".gz", ""), "r") as f:
                     for line in f:
                         if self.positional:
                             term_r, *postings = f.readline().strip().split(" ")
@@ -278,12 +288,11 @@ class Indexer:
                         else:
                             term_r, *postings = line.strip().split(" ")
 
-                        print(term_r, term)
                         if term_r == term:
                             return postings
         else:
             logging.error(
-                "An error occured when searching for the term:" + term)
+                "An error occured when searching for the term: " + term)
             exit(1)
 
     def clear_blocks(self):
@@ -320,13 +329,12 @@ class Indexer:
         logging.error("Could not open the provided file")
         exit(1)
 
-    def open_merge_file(self, filename):
+    def open_merge_file(self, filename, mode="w"):
         """Open and return a index file."""
-
         if self.save_zip:
-            f = gzip.open(filename + ".gz", "wt")
+            f = gzip.open(filename + ".gz", mode + "t")
         else:
-            f = open(filename, "w")
+            f = open(filename, mode)
         return f
 
     def merge_block_disk(self):

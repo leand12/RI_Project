@@ -71,21 +71,22 @@ group2.add_argument('--contractions-file', metavar='FILE', default="../data/en_c
 args = vars(parser.parse_args())
 
 if __name__ == "__main__":
-    if args["config"]:
-        indexer = Indexer.read_config(args["config"])
-    else:
-        tokenizer = Tokenizer(**args)
-        indexer = Indexer(tokenizer=tokenizer, **args)
+    if args["dataset"]:
+        if args["config"]:
+            indexer = Indexer.read_config(args["config"])
+        else:
+            tokenizer = Tokenizer(**args)
+            indexer = Indexer(tokenizer=tokenizer, **args)
+
+        start = timer()
+        indexer.index_file(args["dataset"])
+        logging.info(f"Finished indexing ({timer() - start:.2f} seconds)")
+        logging.info(f"Vocabulary size: {indexer.vocabulary_size}")
+        logging.info(f"Index size on disk: {indexer.disk_size}")
+        logging.info(f"Index segments written to disk: {indexer.num_segments}")
 
     start = timer()
-    indexer.index_file(args["dataset"])
-    logging.info(f"Finished indexing ({timer() - start:.2f} seconds)")
-    logging.info(f"Vocabulary size: {indexer.vocabulary_size}")
-    logging.info(f"Index size on disk: {indexer.disk_size}")
-    logging.info(f"Index segments written to disk: {indexer.num_segments}")
-
-    start = timer()
-    indexer = Indexer.load_metadata("./indexer/")
+    indexer = Indexer.load_metadata(args["indexer"] if args["indexer"] else indexer.merge_dir)
     logging.info(
         f"Time taken to start up index: {timer() - start:.2f} seconds")
 
@@ -96,11 +97,8 @@ if __name__ == "__main__":
     start = timer()
     results = query.search(search)
 
-    # TODO: not finished yet
-    """
     if results:
         logging.info(
             f"{len(results)} results ({timer() - start:.2f} seconds)")
     else:
         logging.info(f"Your search - {search} - did not match any documents")
-    """
