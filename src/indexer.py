@@ -480,18 +480,7 @@ class Indexer:
 
                 if not terms:
                     continue
-                # this stores the tf-score for each term in each doc
-                # term -> {doc: w}
-
-                """
-                lnc.ltc
-
-                l uses the logarithm to calculate the term frequency
-                n when calculating the weights for the document it is not necessary to 
-                    use idf 
-                c uses the cossine normalization which is equal to the sqrt of the sum of the squares
-                    for each weight in a document
-                """
+               
                 # here its done the l where the frequency of a term in this document is obtained
                 temp = [term for term, pos in terms]
                 cos_norm = 0
@@ -508,6 +497,7 @@ class Indexer:
 
                 self.index_terms(terms, doc)
                 self.n_doc_indexed += 1
+            
             self.idf_score()
             self.merge_block_disk()
             self.write_term_info_disk()
@@ -516,11 +506,6 @@ class Indexer:
             self.write_indexer_config()
 
     def idf_score(self):
-
-        # FIXME:
-        # this can only be calculated after the file is fully indexed
-        self.n_doc_indexed = sum(
-            [v[0] for v in self.term_info.values()])  # ta mal
 
         for term in self.term_doc_weights:
             term_frequency = self.term_info[term][0]

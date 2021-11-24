@@ -8,7 +8,7 @@ import argparse
 from tokenizer import Tokenizer
 from indexer import Indexer
 from query import Query
-from timeit import default_timer as timer
+import time
 
 logger = logging.getLogger(__name__)
 coloredlogs.install(level='DEBUG')
@@ -78,30 +78,33 @@ if __name__ == "__main__":
             tokenizer = Tokenizer(**args)
             indexer = Indexer(tokenizer=tokenizer, **args)
 
-        start = timer()
+        start = time.perf_counter()
         indexer.index_file(args["dataset"])
-        logging.info(f"Finished indexing ({timer() - start:.2f} seconds)")
+        logging.info(f"Finished indexing ({time.perf_counter() - start:.2f} seconds)")
         logging.info(f"Vocabulary size: {indexer.vocabulary_size}")
         logging.info(f"Index size on disk: {indexer.disk_size}")
         logging.info(f"Index segments written to disk: {indexer.num_segments}")
 
 
-    start = timer()
+    start = time.perf_counter()
     indexer = Indexer.load_metadata(args["indexer"] if args["indexer"] else indexer.merge_dir)
 
     #indexer.idf_score()
     logging.info(
-        f"Time taken to start up index: {timer() - start:.2f} seconds")
+        f"Time taken to start up index: {time.perf_counter() - start:.2f} seconds")
 
     query = Query(indexer)
 
     search = input("Search: ")
-
-    start = timer()
+    """
+    start = time.perf_counter()
     results = query.search(search)
 
     if results:
         logging.info(
-            f"{len(results)} results ({timer() - start:.2f} seconds)")
+            f"{len(results)} results ({time.perf_counter() - start:.2f} seconds)")
+        logging.info(results)
     else:
         logging.info(f"Your search - {search} - did not match any documents")
+    """
+    query.search_file("queries.txt")
