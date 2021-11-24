@@ -85,8 +85,11 @@ if __name__ == "__main__":
         logging.info(f"Index size on disk: {indexer.disk_size}")
         logging.info(f"Index segments written to disk: {indexer.num_segments}")
 
+
     start = timer()
     indexer = Indexer.load_metadata(args["indexer"] if args["indexer"] else indexer.merge_dir)
+
+    indexer.idf_score()
     logging.info(
         f"Time taken to start up index: {timer() - start:.2f} seconds")
 

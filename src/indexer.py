@@ -38,6 +38,11 @@ class Indexer:
 
         self.save_zip = save_zip
 
+        # FIXME: not sure
+        self.n_doc_indexed = 0
+        self.term_doc_weights = {}
+        self.tf_idf_weights = {}
+
         self.__doc_id_cnt = 0
         self.doc_ids = {}
         self.rename_doc = rename_doc
@@ -271,25 +276,36 @@ class Indexer:
                     while (line := f.readline()):
 
                         if self.positional:
+                            # TODO: positions are not being used
                             term_r, *postings = line.strip().split(" ")
-                            postings = [pos.split(',')[0] for pos in postings]
+                            postings = [pos.split(',')[:2] for pos in postings]
                         else:
                             term_r, *postings = line.strip().split(" ")
-
+                            postings = [pos.split(',') for pos in postings]
+                        
+                        term_r, idf = term_r.split(',')
+                        
                         if term == term_r:
-                            return postings
+                            weights = [pos[1] for pos in postings]
+                            postings = [pos[0] for pos in postings]
+                            return idf, weights, postings
                     assert False, "Should find a term"
             else:
                 with self.open_merge_file(term_file.replace(".gz", ""), "r") as f:
                     for line in f:
                         if self.positional:
                             term_r, *postings = f.readline().strip().split(" ")
-                            postings = [pos.split(',')[0] for pos in postings]
+                            postings = [pos.split(',')[:2] for pos in postings]
                         else:
                             term_r, *postings = line.strip().split(" ")
+                            postings = [pos.split(',') for pos in postings]
+
+                        term_r, idf = term_r.split(',')
 
                         if term_r == term:
-                            return postings
+                            weights = [pos[1] for pos in postings]
+                            postings = [pos[0] for pos in postings]
+                            return idf, weights, postings
         else:
             logging.error(
                 "An error occured when searching for the term: " + term)
@@ -367,8 +383,14 @@ class Indexer:
                         continue
 
                     for doc in docs:
-                        line = doc.strip().split(" ")
+                        line = doc.strip().split(' ')
                         term, doc_lst = line[0], line[1:]
+                        if True: #self.ranking: # FIXME: 
+                            for i, doc_str in enumerate(doc_lst):
+                                doc = doc_str.split(',', 1)[0]
+                                # doc_lst[i] += ',' + self.term_doc_weights[term][doc]
+                                n = len(doc) # doc,w,p1,p2
+                                doc_lst[i] += doc_lst[i][:n] + ',' + self.term_doc_weights[term][doc] + doc_lst[i][n:]
                         terms.setdefault(term, set()).update(doc_lst)
                     last_terms[b] = term
                 b += 1
@@ -391,7 +413,7 @@ class Indexer:
                     for ti, t in enumerate(sorted_terms):
                         if t <= term:
                             f.write(
-                                t + " " + " ".join(sorted(terms[t])) + "\n")
+                                t + "," + str(self.tf_idf_weights[t]) + " " + " ".join(sorted(terms[t])) + "\n")
                             if self.file_location and ti % self.file_location_step == 0:
                                 self.term_info[t][1] = ti + 1
                             del terms[t]
@@ -399,7 +421,7 @@ class Indexer:
                 # this will write the terms left in the last block
                 with self.open_merge_file(self.merge_dir + sorted_terms[0] + " " + term + ".txt") as f:
                     for ti, t in enumerate(sorted_terms):
-                        f.write(t + " " + " ".join(sorted(terms[t])) + "\n")
+                        f.write(t + "," + str(self.tf_idf_weights[t]) + " " + " ".join(sorted(terms[t])) + "\n")
                         if self.file_location and ti % self.file_location_step == 0:
                             self.term_info[t][1] = ti + 1
                         del terms[t]
@@ -453,10 +475,49 @@ class Indexer:
                     self.write_block_disk()
                     break
                 terms, doc = self.tokenizer.tokenize(line)
-                self.index_terms(terms, doc)
+                # this stores the tf-score for each term in each doc
+                # term -> {doc: w}
 
+                """
+                lnc.ltc
+
+                l uses the logarithm to calculate the term frequency
+                n when calculating the weights for the document it is not necessary to 
+                    use idf 
+                c uses the cossine normalization which is equal to the sqrt of the sum of the squares
+                    for each weight in a document
+                """
+
+                # here its done the l where the frequency of a term in this document is obtained
+                temp = [term for term, pos in terms]
+                cos_norm = 0
+                for term in set(temp):
+                    self.term_doc_weights.setdefault(term, {})
+                    self.term_doc_weights[term][doc] = 1 + math.log10(temp.count(term))
+                    cos_norm += self.term_doc_weights[term][doc]**2
+
+                # here its done the cossine normalization where the previous obtained weights
+                cos_norm = 1 / math.sqrt(cos_norm)
+                for term in set(temp):
+                    self.term_doc_weights[term][doc] *= cos_norm
+                    
+
+                self.index_terms(terms, doc)
+                self.n_doc_indexed += 1
+            self.idf_score()
             self.merge_block_disk()
             self.write_term_info_disk()
             if self.rename_doc:
                 self.write_doc_ids()
             self.write_indexer_config()
+
+    def idf_score(self):
+        
+        # FIXME:
+        # this can only be calculated after the file is fully indexed
+        self.n_doc_indexed = sum([v[0] for v in self.term_info.values()]) # ta mal
+        
+        for term in self.term_doc_weights:
+            term_frequency = self.term_info[term][0]
+            idf = math.log10(self.n_doc_indexed / term_frequency)
+            self.tf_idf_weights[term] = idf
