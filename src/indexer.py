@@ -190,7 +190,7 @@ class Indexer:
             # term posting_size file_location
             for term in sorted(self.term_info):
                 f.write(term + " " + " ".join(str(i)
-                        for i in self.term_info[term]).strip() + "\n")
+                                              for i in self.term_info[term]).strip() + "\n")
 
     def read_term_info_memory(self):
         """Reads term information from metadata."""
@@ -237,7 +237,8 @@ class Indexer:
         files = glob.glob(self.merge_dir + "/*.txt*")
         term_file = None
         for f in files:
-            f_terms = f.split("/")[-1].replace(".gz", "").split(".txt")[0].split(" ")
+            f_terms = f.split("/")[-1].replace(".gz", "") \
+                .split(".txt")[0].split(" ")
             if term >= f_terms[0] and term <= f_terms[1]:
                 term_file = f
                 break
@@ -262,7 +263,7 @@ class Indexer:
                         high = index - 1
                     else:
                         break
-                
+
                 for i in range(self.file_location_step):
                     if self.term_info[sorted_term_info[index-i]][1]:
                         # previous term has file location
@@ -282,14 +283,13 @@ class Indexer:
                         else:
                             term_r, *postings = line.strip().split(" ")
                             postings = [pos.split(',') for pos in postings]
-                        
+
                         term_r, idf = term_r.split(',')
-                        
+
                         if term == term_r:
                             weights = [pos[1] for pos in postings]
                             postings = [pos[0] for pos in postings]
                             return idf, weights, postings
-                    assert False, "Should find a term"
             else:
                 with self.open_merge_file(term_file.replace(".gz", ""), "r") as f:
                     for line in f:
@@ -355,7 +355,7 @@ class Indexer:
 
     def merge_block_disk(self):
         """Merge all blocks in disk."""
-        
+
         if not os.path.exists(self.merge_dir):
             os.mkdir(self.merge_dir)
             os.mkdir(self.merge_dir + ".metadata/")
@@ -385,12 +385,13 @@ class Indexer:
                     for doc in docs:
                         line = doc.strip().split(' ')
                         term, doc_lst = line[0], line[1:]
-                        if True: #self.ranking: # FIXME: 
+                        if True:  # self.ranking: # FIXME:
                             for i, doc_str in enumerate(doc_lst):
                                 doc = doc_str.split(',', 1)[0]
                                 # doc_lst[i] += ',' + self.term_doc_weights[term][doc]
-                                n = len(doc) # doc,w,p1,p2
-                                doc_lst[i] += doc_lst[i][:n] + ',' + self.term_doc_weights[term][doc] + doc_lst[i][n:]
+                                n = len(doc)
+                                doc_lst[i] = (doc_str[:n] + ',' + 
+                                    str(self.term_doc_weights[term][doc]) + doc_str[n:])
                         terms.setdefault(term, set()).update(doc_lst)
                     last_terms[b] = term
                 b += 1
@@ -421,7 +422,8 @@ class Indexer:
                 # this will write the terms left in the last block
                 with self.open_merge_file(self.merge_dir + sorted_terms[0] + " " + term + ".txt") as f:
                     for ti, t in enumerate(sorted_terms):
-                        f.write(t + "," + str(self.tf_idf_weights[t]) + " " + " ".join(sorted(terms[t])) + "\n")
+                        f.write(
+                            t + "," + str(self.tf_idf_weights[t]) + " " + " ".join(sorted(terms[t])) + "\n")
                         if self.file_location and ti % self.file_location_step == 0:
                             self.term_info[t][1] = ti + 1
                         del terms[t]
@@ -475,6 +477,9 @@ class Indexer:
                     self.write_block_disk()
                     break
                 terms, doc = self.tokenizer.tokenize(line)
+
+                if not terms:
+                    continue
                 # this stores the tf-score for each term in each doc
                 # term -> {doc: w}
 
@@ -487,20 +492,19 @@ class Indexer:
                 c uses the cossine normalization which is equal to the sqrt of the sum of the squares
                     for each weight in a document
                 """
-
                 # here its done the l where the frequency of a term in this document is obtained
                 temp = [term for term, pos in terms]
                 cos_norm = 0
                 for term in set(temp):
                     self.term_doc_weights.setdefault(term, {})
-                    self.term_doc_weights[term][doc] = 1 + math.log10(temp.count(term))
+                    self.term_doc_weights[term][doc] = 1 + \
+                        math.log10(temp.count(term))
                     cos_norm += self.term_doc_weights[term][doc]**2
 
                 # here its done the cossine normalization where the previous obtained weights
                 cos_norm = 1 / math.sqrt(cos_norm)
                 for term in set(temp):
                     self.term_doc_weights[term][doc] *= cos_norm
-                    
 
                 self.index_terms(terms, doc)
                 self.n_doc_indexed += 1
@@ -512,11 +516,12 @@ class Indexer:
             self.write_indexer_config()
 
     def idf_score(self):
-        
+
         # FIXME:
         # this can only be calculated after the file is fully indexed
-        self.n_doc_indexed = sum([v[0] for v in self.term_info.values()]) # ta mal
-        
+        self.n_doc_indexed = sum(
+            [v[0] for v in self.term_info.values()])  # ta mal
+
         for term in self.term_doc_weights:
             term_frequency = self.term_info[term][0]
             idf = math.log10(self.n_doc_indexed / term_frequency)

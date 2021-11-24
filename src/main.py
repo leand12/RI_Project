@@ -89,7 +89,7 @@ if __name__ == "__main__":
     start = timer()
     indexer = Indexer.load_metadata(args["indexer"] if args["indexer"] else indexer.merge_dir)
 
-    indexer.idf_score()
+    #indexer.idf_score()
     logging.info(
         f"Time taken to start up index: {timer() - start:.2f} seconds")
 

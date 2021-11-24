@@ -17,6 +17,10 @@ class Query:
     def search(self, query):
 
         terms = self.indexer.tokenizer.normalize_tokens(query.strip().split())
+
+        if not terms:
+            assert False, "nothing"
+        
         sizes = [self.indexer.term_info[term][0] if self.indexer.term_info.get(term) else 0 for term in terms ]
         #terms = list(zip(terms, sizes))
         print(terms)
@@ -26,22 +30,23 @@ class Query:
         cos_norm = 0
         w_terms = {}
         for term in set(terms):
+            if not (term_info := self.indexer.read_posting_lists(term)):
+                continue
+            idf, weights, postings = term_info
             l = 1 + math.log10(terms.count(term)) # no. de terms no documento
-            t = self.indexer.tf_idf_weights[term]
+            t = float(idf)
             cos_norm += (l * t) ** 2
             w_terms[term] = (l * t)
+            for i, doc in enumerate(postings):
+                scores.setdefault(doc, 0)
+                scores[doc] += float(weights[i]) * w_terms[term]
 
-        cos_norm = 1 / math.sqrt(cos_norm)
-        for term in set(terms):
-            w_terms[term] *= cos_norm
-        
-        for term in set(terms):
-            for doc, w in self.indexer.term_doc_weights[term].items():
-                scores[doc].setdefault(doc, 0)
-                scores[doc] += w * w_terms[term]
-
-        
-        print([(s, scores[s]) for s in list(scores)[:10]])
+        if scores:
+            cos_norm = 1 / math.sqrt(cos_norm)
+            for doc in scores:
+                scores[doc] *= cos_norm
+            print([(k, v) for k, v in sorted(scores.items(), key=lambda x: -x[1])])
+            return scores
         """
         
         # and is not longer required
