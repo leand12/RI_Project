@@ -22,7 +22,7 @@ class Indexer:
 
         self.positional = positional
         self.index = {}             # {term: {doc: [pos]}} || {term: [docs]}  
-        self.term_info = {}         # {term: [df, file_loc, weights]}
+        self.term_info = {}         # {term: [df, file_loc]}
         
         path, _ = os.path.split(os.path.abspath(__file__))
         self.block_dir = block_dir if os.path.isabs(
@@ -90,18 +90,11 @@ class Indexer:
         with open(filename, "r") as f:
             data = json.loads(f.read())
 
-            indexer_data = data.get("indexer")
-            tokenizer_data = data.get("tokenizer")
+            indexer_data = data.get("indexer") or {}
+            tokenizer_data = data.get("tokenizer") or {}
 
-            if tokenizer_data:
-                tokenizer = Tokenizer(**tokenizer_data)
-            else:
-                tokenizer = Tokenizer()
-
-            if indexer_data:
-                indexer = Indexer(tokenizer=tokenizer, **indexer_data)
-            else:
-                indexer = Indexer(tokenizer=tokenizer)
+            tokenizer = Tokenizer(**tokenizer_data)
+            indexer = Indexer(tokenizer=tokenizer, **indexer_data)
 
             return indexer
 
@@ -131,40 +124,42 @@ class Indexer:
                 "stemmer": True
             }
             data = {"indexer": indexer, "tokenizer": tokenizer}
-            j = json.dump(data, f, indent=2)
+            json.dump(data, f, indent=2)
 
     def write_block_disk(self):
         """Writes the current block to disk."""
 
-        if not os.path.exists(self.block_dir):
-            os.mkdir(self.block_dir)
+        logging.info("Writing block to disk")
+        block_dir = self.merge_dir + "block/"
+        if not os.path.exists(self.merge_dir):
+            os.mkdir(self.merge_dir)
+        if not os.path.exists(block_dir):
+            os.mkdir(block_dir)
 
         # resets the number of postings in memory
         self.__post_cnt = 0
 
-        with open(self.block_dir + "block" + str(self.__block_cnt) + ".txt", "w+") as f:
+        with open(f"{block_dir}block{self.__block_cnt}.txt", "w+") as f:
             self.__block_cnt += 1
-            if self.positional:
-                # term doc1,pos1,pos2 doc2,pos1
-                for term in sorted(self.index):
-                    f.write(term + " " + " ".join([
-                        doc + "," + ",".join(self.index[term][doc]) for doc in self.index[term]
-                    ]) + "\n")
-                    self.term_info.setdefault(term, [0, ''])[
-                        0] += len(self.index[term])
-            else:
-                # term doc1 doc2
-                for term in sorted(self.index):
-                    f.write(term + " " + " ".join(self.index[term]) + "\n")
-                    self.term_info.setdefault(term, [0, ''])[
-                        0] += len(self.index[term])
+            
+            for term in sorted(self.index):
+                if self.positional:
+                    # term doc1,pos1,pos2 doc2,pos1
+                    write = f"{term} {' '.join([doc + ',' + ','.join(self.index[term][doc]) for doc in self.index[term]])}\n"
+                else:
+                    # term doc1 doc2
+                    write = f"{term} {''.join(self.index[term])}\n"
+                
+                f.write(write)
+                self.term_info.setdefault(term, [0, ''])[0] += len(self.index[term])    #FIXME: maybe meter isto num objeto?
+
             self.index = {}
 
     def write_indexer_config(self):
         """Saves the current configuration as metadata."""
 
         logging.info("Writing indexer config to disk")
-        with open(self.merge_dir + ".metadata/config.json", "w") as f:
+        with open(f"{self.merge_dir}.metadata/config.json", "w") as f:
 
             indexer = {
                 "positional": self.positional,
@@ -188,7 +183,7 @@ class Indexer:
             }
 
             data = {"indexer": indexer, "tokenizer": tokenizer}
-            j = json.dump(data, f, indent=2)
+            json.dump(data, f, indent=2)
 
     def write_term_info_disk(self):
         """Saves term information as metadata."""
@@ -197,17 +192,16 @@ class Indexer:
         with open(self.merge_dir + ".metadata/term_info.txt", "w+") as f:
 
             # term posting_size file_location
-            for term in sorted(self.term_info):
-                f.write(term + " " + " ".join(str(i)
-                                              for i in self.term_info[term]).strip() + "\n")
+            for term in sorted(self.term_info): #FIXME: se tivessemos o term info como objeto era mais facil de escrever em ficheiros XD
+                f.write(f"{term} {' '.join(str(i)for i in self.term_info[term]).strip()}\n")
 
     def read_term_info_memory(self):
         """Reads term information from metadata."""
 
-        logging.info("Reading # of postings for each term to memory")
+        logging.info("Reading term info to memory")
         self.term_info = {}
 
-        with open(self.merge_dir + ".metadata/term_info.txt", "r") as f:
+        with open(f"{self.merge_dir}.metadata/term_info.txt", "r") as f:
             for line in f:
                 term, *rest = line.strip().split(" ")
                 self.term_info[term] = [int(i) for i in rest] + ([''] if len(rest) < 2 else [])
@@ -216,24 +210,22 @@ class Indexer:
         """Saves the dict containing the new ids for the documents as metadata."""
 
         if not self.rename_doc:
-            logging.warning(
-                "Doc rename is not in use. Cannot write doc ids to disk.")
+            logging.warning("Doc rename is not in use. Cannot write doc ids to disk.")
             return
 
-        with open(self.merge_dir + ".metadata/doc_ids.txt", "w") as f:
+        with open(f"{self.merge_dir}.metadata/doc_ids.txt", "w") as f:
             for doc_id, doc in self.doc_ids.items():
-                f.write(doc_id + " " + doc + "\n")
+                f.write(f"{doc_id} {doc}\n")
 
     def read_doc_ids(self):
         """Reads document id conversion from metadata."""
 
         if not self.rename_doc:
-            logging.warning(
-                "Doc rename is not in use. Cannot write doc ids to disk.")
+            logging.warning("Doc rename is not in use. Cannot write doc ids to disk.")
             return
 
         self.doc_ids = {}
-        with open(self.merge_dir + ".metadata/doc_ids.txt", "r") as f:
+        with open(f"{self.merge_dir}.metadata/doc_ids.txt", "r") as f:
             for line in f:
                 doc_id, doc = line.strip().split(" ")
                 self.doc_ids[doc_id] = doc
@@ -242,8 +234,11 @@ class Indexer:
     def read_posting_lists(self, term):
         """Reads the posting list of a term from disk."""
 
+        if not os.path.exists(self.merge_dir):
+            logging.error("Index Directory does not exist. Cannot read posting lists.")
+
         # search for file
-        files = glob.glob(self.merge_dir + "/*.txt*")
+        files = glob.glob(f"{self.merge_dir}/*.txt*")
         term_file = None
         for f in files:
             f_terms = f.split("/")[-1].replace(".gz", "") \
@@ -256,6 +251,7 @@ class Indexer:
         if term_file != None:
 
             if self.file_location:
+                # FIXME: if file_location is 1 then we can access it with 0(1) and forget about this for that case
                 term_location = 0
                 sorted_term_info = sorted(self.term_info.keys())
                 initial_term, final_term = term_file.split(
@@ -316,15 +312,19 @@ class Indexer:
                             postings = [pos[0] for pos in postings]
                             return idf, weights, postings
         else:
-            logging.error(
-                "An error occured when searching for the term: " + term)
+            logging.error(f"An error occured when searching for the term: {term}")
             exit(1)
 
     def clear_blocks(self):
         """Remove blocks folder."""
-
+        
         logging.info("Removing unused blocks")
-        blocks = glob.glob(self.block_dir + "block*.txt")
+
+        if not os.path.exists(f"{self.merge_dir}block/"):
+            logging.error("Block directory does not exist. Could not remove blocks.")
+            exit(1)
+
+        blocks = glob.glob(f"{self.merge_dir}block/block*.txt")
 
         for block in blocks:
             try:
@@ -336,7 +336,7 @@ class Indexer:
 
     def open_file_to_index(self, filename):
         """Open and return the dataset file."""
-
+        #FIXME: what
         try:
             f = open(filename, "r")
             f.readline()  # skip header
@@ -356,6 +356,7 @@ class Indexer:
 
     def open_merge_file(self, filename, mode="w"):
         """Open and return a index file."""
+        # FIXME: dont like that i need to remove .gz above, change this maybe
         if self.save_zip:
             f = gzip.open(filename + ".gz", mode + "t")
         else:
@@ -439,6 +440,40 @@ class Indexer:
 
         self.clear_blocks()
 
+    def __get_new_doc_id(self, doc):
+
+        # FIXME: change this to use letters and numbers
+        doc_id = str(self.__doc_id_cnt)
+        self.doc_ids[doc_id] = doc
+        self.__doc_id_cnt += 1
+        return doc_id
+
+    def __calculate_ranking_info(self, terms, doc):
+        
+        if self.ranking == "VS":
+            # here its done the l where the frequency of a term in this document is obtained
+            temp = [term for term, pos in terms]
+            cos_norm = 0
+            for term in set(temp):
+                self.term_doc_weights.setdefault(term, {})
+                self.term_doc_weights[term][doc] = 1 + \
+                    math.log10(temp.count(term))
+                cos_norm += self.term_doc_weights[term][doc]**2
+
+            # here its done the cossine normalization where the previous obtained weights
+            cos_norm = 1 / math.sqrt(cos_norm)
+            for term in set(temp):
+                self.term_doc_weights[term][doc] *= cos_norm
+
+        elif self.ranking == "BM25":
+            
+            temp = [term for term, pos in terms]
+            self.document_lens[doc] = len(terms)
+            for term in set(temp):
+                self.term_frequency.setdefault(term, {})
+                self.term_frequency[term][doc] = temp.count(term)
+
+
     def index_terms(self, terms, doc):
         """
         Index a list of terms provided by the tokenizer.
@@ -449,15 +484,10 @@ class Indexer:
         # indexes a list of terms provided by the tokenizer
 
         if self.rename_doc:
-            doc_id = str(self.__doc_id_cnt)
-            self.doc_ids[doc_id] = doc
-            doc = doc_id
-            self.__doc_id_cnt += 1
-
-        # the last indexes need to be written to a block is not full
-        if self.__post_cnt >= self.block_threshold:
-            logging.info("Writing to disk")
-            self.write_block_disk()
+            doc = self.__get_new_doc_id(doc)
+        
+        # FIXME: idk if this works inside this function
+        self.__calculate_ranking_info(terms, doc)
 
         # terms -> List[Tuple(term, pos)]
         for term, pos in terms:
@@ -481,56 +511,38 @@ class Indexer:
         with self.open_file_to_index(filename) as f:
             while f:
                 line = f.readline()
-
-                if len(line) == 0:
+                
+                # writes block to disk when there are more postings than the threshold
+                # or when the file ends
+                if len(line) == 0 or self.__post_cnt >= self.block_threshold: 
                     self.write_block_disk()
-                    break
+                    #break # FIXME: if tokenize does not return anything it will continue 
+                    # meaning that it will not do anything on the next line because
+                    # it leaves the while, so the break might not be necessary
+
                 terms, doc = self.tokenizer.tokenize(line)
 
                 if not terms:
                     continue
-                    
-                if self.ranking == "VS":
-                    # here its done the l where the frequency of a term in this document is obtained
-                    temp = [term for term, pos in terms]
-                    cos_norm = 0
-                    for term in set(temp):
-                        self.term_doc_weights.setdefault(term, {})
-                        self.term_doc_weights[term][doc] = 1 + \
-                            math.log10(temp.count(term))
-                        cos_norm += self.term_doc_weights[term][doc]**2
-
-                    # here its done the cossine normalization where the previous obtained weights
-                    cos_norm = 1 / math.sqrt(cos_norm)
-                    for term in set(temp):
-                        self.term_doc_weights[term][doc] *= cos_norm
-
-                elif self.ranking == "BM25":
-                    # ler o numero de termos neste documento e guardar 
-                    temp = [term for term, pos in terms]
-                    self.document_lens[doc] = len(terms)
-                    for term in set(temp):
-                        self.term_frequency.setdefault(term, {})
-                        self.term_frequency[term][doc] = temp.count(term)
 
                 self.index_terms(terms, doc)
                 self.n_doc_indexed += 1
             
-            self.idf_score()
-            self.merge_block_disk()
-            self.write_term_info_disk()
-            if self.rename_doc:
-                self.write_doc_ids()
-            self.write_indexer_config()
+        self.__calculate_idf()
+        self.merge_block_disk()
+        self.write_term_info_disk()
+        if self.rename_doc:
+            self.write_doc_ids()
+        self.write_indexer_config()
 
-    def idf_score(self):
+    def __calculate_idf(self):
 
         for term in self.term_doc_weights:
-            term_frequency = self.term_info[term][0]
-            idf = math.log10(self.n_doc_indexed / term_frequency)
+            document_frequency = self.term_info[term][0]
+            idf = math.log10(self.n_doc_indexed / document_frequency)
             self.idf[term] = idf
 
-    def calculate_ci(self):
+    def __calculate_ci(self):
         # FIXME: 
         # add k1 and b to the parameters
         
@@ -549,11 +561,3 @@ class Indexer:
                 ci = idf * (k1 + 1) * term_frequency / (k1 * ((1 - b) + b * document_len/avdl) + term_frequency)
                 self.term_doc_weights.setdefault(term, {})
                 self.term_doc_weights[term][doc] = ci           
-            
-        
-        
-        
-        
-        
-        
-        
