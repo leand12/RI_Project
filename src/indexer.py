@@ -21,8 +21,9 @@ class Indexer:
                  block_dir="block/", merge_dir="indexer/", **ignore):
 
         self.positional = positional
-        self.index = {}
-        self.term_info = {}     # keeps the number of postings of a term
+        self.index = {}             # {term: {doc: [pos]}} || {term: [docs]}  
+        self.term_info = {}         # {term: [df, file_loc, weights]}
+        
         path, _ = os.path.split(os.path.abspath(__file__))
         self.block_dir = block_dir if os.path.isabs(
             block_dir) else path + "/" + block_dir
@@ -38,15 +39,23 @@ class Indexer:
 
         self.save_zip = save_zip
 
-        # FIXME: not sure
+        # VS
         self.n_doc_indexed = 0
         self.term_doc_weights = {}
-        self.tf_idf_weights = {}
+        self.idf = {}
+        
+        
+        # BM25
+        self.document_lens = {}     # saves the number of words for each document
+        self.term_frequency = {}    # save
 
+
+        # RENAME DOC
         self.__doc_id_cnt = 0
         self.doc_ids = {}
         self.rename_doc = rename_doc
 
+        # FILE LOCATION
         self.file_location = file_location
         self.file_location_step = file_location_step
         self.__post_cnt = 0
@@ -414,7 +423,7 @@ class Indexer:
                     for ti, t in enumerate(sorted_terms):
                         if t <= term:
                             f.write(
-                                t + "," + str(self.tf_idf_weights[t]) + " " + " ".join(sorted(terms[t])) + "\n")
+                                t + "," + str(self.idf[t]) + " " + " ".join(sorted(terms[t])) + "\n")
                             if self.file_location and ti % self.file_location_step == 0:
                                 self.term_info[t][1] = ti + 1
                             del terms[t]
@@ -423,7 +432,7 @@ class Indexer:
                 with self.open_merge_file(self.merge_dir + sorted_terms[0] + " " + term + ".txt") as f:
                     for ti, t in enumerate(sorted_terms):
                         f.write(
-                            t + "," + str(self.tf_idf_weights[t]) + " " + " ".join(sorted(terms[t])) + "\n")
+                            t + "," + str(self.idf[t]) + " " + " ".join(sorted(terms[t])) + "\n")
                         if self.file_location and ti % self.file_location_step == 0:
                             self.term_info[t][1] = ti + 1
                         del terms[t]
@@ -480,20 +489,29 @@ class Indexer:
 
                 if not terms:
                     continue
-               
-                # here its done the l where the frequency of a term in this document is obtained
-                temp = [term for term, pos in terms]
-                cos_norm = 0
-                for term in set(temp):
-                    self.term_doc_weights.setdefault(term, {})
-                    self.term_doc_weights[term][doc] = 1 + \
-                        math.log10(temp.count(term))
-                    cos_norm += self.term_doc_weights[term][doc]**2
+                    
+                if self.ranking == "VS":
+                    # here its done the l where the frequency of a term in this document is obtained
+                    temp = [term for term, pos in terms]
+                    cos_norm = 0
+                    for term in set(temp):
+                        self.term_doc_weights.setdefault(term, {})
+                        self.term_doc_weights[term][doc] = 1 + \
+                            math.log10(temp.count(term))
+                        cos_norm += self.term_doc_weights[term][doc]**2
 
-                # here its done the cossine normalization where the previous obtained weights
-                cos_norm = 1 / math.sqrt(cos_norm)
-                for term in set(temp):
-                    self.term_doc_weights[term][doc] *= cos_norm
+                    # here its done the cossine normalization where the previous obtained weights
+                    cos_norm = 1 / math.sqrt(cos_norm)
+                    for term in set(temp):
+                        self.term_doc_weights[term][doc] *= cos_norm
+
+                elif self.ranking == "BM25":
+                    # ler o numero de termos neste documento e guardar 
+                    temp = [term for term, pos in terms]
+                    self.document_lens[doc] = len(terms)
+                    for term in set(temp):
+                        self.term_frequency.setdefault(term, {})
+                        self.term_frequency[term][doc] = temp.count(term)
 
                 self.index_terms(terms, doc)
                 self.n_doc_indexed += 1
@@ -510,4 +528,32 @@ class Indexer:
         for term in self.term_doc_weights:
             term_frequency = self.term_info[term][0]
             idf = math.log10(self.n_doc_indexed / term_frequency)
-            self.tf_idf_weights[term] = idf
+            self.idf[term] = idf
+
+    def calculate_ci(self):
+        # FIXME: 
+        # add k1 and b to the parameters
+        
+        k1  = 1 
+        b = 1
+        self.term_doc_weights = {}     # {term : {doc: ci}}
+        avdl = sum(self.document_lens.values())/len(self.document_lens) # TODO: this is slow
+        
+        for term in self.term_frequency:
+            idf = self.idf[term]
+            
+            for doc in self.term_frequency[term]:
+                term_frequency = self.term_frequency[term][doc]
+                document_len = self.document_lens[doc]
+                
+                ci = idf * (k1 + 1) * term_frequency / (k1 * ((1 - b) + b * document_len/avdl) + term_frequency)
+                self.term_doc_weights.setdefault(term, {})
+                self.term_doc_weights[term][doc] = ci           
+            
+        
+        
+        
+        
+        
+        
+        

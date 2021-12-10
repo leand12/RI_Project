@@ -26,8 +26,12 @@ class Query:
         if not terms:
             assert False, "The provided query is not valid"
         
-        sizes = [self.indexer.term_info[term][0] if self.indexer.term_info.get(term) else 0 for term in terms ]
+        #sizes = [self.indexer.term_info[term][0] if self.indexer.term_info.get(term) else 0 for term in terms ]
 
+        return self.tf_idf_score(terms)
+
+    def tf_idf_score(self, terms):
+        
         scores = {}
         cos_norm = 0
         for term in set(terms):
@@ -44,3 +48,9 @@ class Query:
             for doc in scores:
                 scores[doc] *= cos_norm
             return sorted(scores.items(), key=lambda x: -x[1])[:100]
+        
+        
+    def bm25_score(self, terms):
+        
+        pass
+        
