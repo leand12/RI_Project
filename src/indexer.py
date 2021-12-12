@@ -21,9 +21,9 @@ class Indexer:
                  block_dir="block/", merge_dir="indexer/", **ignore):
 
         self.positional = positional
-        self.index = {}             # {term: {doc: [pos]}} || {term: [docs]}  
+        self.index = {}             # {term: {doc: [pos]}} || {term: [docs]}
         self.term_info = {}         # {term: [df, file_loc]}
-        
+
         path, _ = os.path.split(os.path.abspath(__file__))
         self.block_dir = block_dir if os.path.isabs(
             block_dir) else path + "/" + block_dir
@@ -43,12 +43,10 @@ class Indexer:
         self.n_doc_indexed = 0
         self.term_doc_weights = {}
         self.idf = {}
-        
-        
+
         # BM25
         self.document_lens = {}     # saves the number of words for each document
         self.term_frequency = {}    # save
-
 
         # RENAME DOC
         self.__doc_id_cnt = 0
@@ -141,7 +139,7 @@ class Indexer:
 
         with open(f"{block_dir}block{self.__block_cnt}.txt", "w+") as f:
             self.__block_cnt += 1
-            
+
             for term in sorted(self.index):
                 if self.positional:
                     # term doc1,pos1,pos2 doc2,pos1
@@ -149,9 +147,11 @@ class Indexer:
                 else:
                     # term doc1 doc2
                     write = f"{term} {''.join(self.index[term])}\n"
-                
+
                 f.write(write)
-                self.term_info.setdefault(term, [0, ''])[0] += len(self.index[term])    #FIXME: maybe meter isto num objeto?
+                # FIXME: maybe meter isto num objeto?
+                self.term_info.setdefault(term, [0, ''])[
+                    0] += len(self.index[term])
 
             self.index = {}
 
@@ -192,8 +192,10 @@ class Indexer:
         with open(self.merge_dir + ".metadata/term_info.txt", "w+") as f:
 
             # term posting_size file_location
-            for term in sorted(self.term_info): #FIXME: se tivessemos o term info como objeto era mais facil de escrever em ficheiros XD
-                f.write(f"{term} {' '.join(str(i)for i in self.term_info[term]).strip()}\n")
+            # FIXME: se tivessemos o term info como objeto era mais facil de escrever em ficheiros XD
+            for term in sorted(self.term_info):
+                f.write(
+                    f"{term} {' '.join(str(i)for i in self.term_info[term]).strip()}\n")
 
     def read_term_info_memory(self):
         """Reads term information from metadata."""
@@ -204,13 +206,15 @@ class Indexer:
         with open(f"{self.merge_dir}.metadata/term_info.txt", "r") as f:
             for line in f:
                 term, *rest = line.strip().split(" ")
-                self.term_info[term] = [int(i) for i in rest] + ([''] if len(rest) < 2 else [])
+                self.term_info[term] = [
+                    int(i) for i in rest] + ([''] if len(rest) < 2 else [])
 
     def write_doc_ids(self):
         """Saves the dict containing the new ids for the documents as metadata."""
 
         if not self.rename_doc:
-            logging.warning("Doc rename is not in use. Cannot write doc ids to disk.")
+            logging.warning(
+                "Doc rename is not in use. Cannot write doc ids to disk.")
             return
 
         with open(f"{self.merge_dir}.metadata/doc_ids.txt", "w") as f:
@@ -221,7 +225,8 @@ class Indexer:
         """Reads document id conversion from metadata."""
 
         if not self.rename_doc:
-            logging.warning("Doc rename is not in use. Cannot write doc ids to disk.")
+            logging.warning(
+                "Doc rename is not in use. Cannot write doc ids to disk.")
             return
 
         self.doc_ids = {}
@@ -231,97 +236,90 @@ class Indexer:
                 self.doc_ids[doc_id] = doc
         self.__doc_id_cnt = len(self.doc_ids)
 
+    def __get_filename(self, path):
+        return path.split("/")[-1].replace(".gz", "").split(".txt")[0]
+
+    def __get_term_location(self, term):
+
+        # TODO: add case when file_location_step is 1 and it is 0(1) to search for it
+        sorted_term_info = sorted(self.term_info.keys())
+
+        low = index = 0
+        high = len(sorted_term_info) - 1
+
+        while low <= high:
+            index = (high + low) // 2
+            if sorted_term_info[index] < term:
+                low = index + 1
+            elif sorted_term_info[index] > term:
+                high = index - 1
+            else:
+                break
+
+        for i in range(self.file_location_step):
+            if self.term_info[sorted_term_info[index-i]][1]:
+                # previous term has file location
+                return self.term_info[sorted_term_info[index-i]][1] + i
+
+    def __get_term_info_from_file(self, term, file, skip=0):
+
+        with self.open_merge_file(file.replace(".gz", ""), "r") as f:
+            for _ in range(skip):
+                f.readline()
+
+            while (line := f.readline()):
+
+                if self.positional:
+                    # TODO: positions are not being used
+                    term_r, *postings = line.strip().split(" ")
+                    postings = [pos.split(',')[:2] for pos in postings]
+                else:
+                    term_r, *postings = line.strip().split(" ")
+                    postings = [pos.split(',') for pos in postings]
+
+                term_r, idf = term_r.split(',')
+
+                if term == term_r:
+                    weights = [pos[1] for pos in postings]
+                    postings = [pos[0] for pos in postings]
+                    return idf, weights, postings
+
     def read_posting_lists(self, term):
         """Reads the posting list of a term from disk."""
 
         if not os.path.exists(self.merge_dir):
-            logging.error("Index Directory does not exist. Cannot read posting lists.")
+            logging.error(
+                "Index Directory does not exist. Cannot read posting lists.")
 
         # search for file
         files = glob.glob(f"{self.merge_dir}/*.txt*")
         term_file = None
         for f in files:
-            f_terms = f.split("/")[-1].replace(".gz", "") \
-                .split(".txt")[0].split(" ")
-            if term >= f_terms[0] and term <= f_terms[1]:
+            f_terms = self.__get_filename(f).split(" ")
+            if f_terms[0] <= term <= f_terms[1]:
                 term_file = f
                 break
 
         # search position on file
         if term_file != None:
-
             if self.file_location:
-                # FIXME: if file_location is 1 then we can access it with 0(1) and forget about this for that case
-                term_location = 0
-                sorted_term_info = sorted(self.term_info.keys())
-                initial_term, final_term = term_file.split(
-                    "/")[-1].replace(".gz", "").split(".txt")[0].split(" ")
-
-                low = index = 0
-                high = len(sorted_term_info) - 1
-
-                while low <= high:
-                    index = (high + low) // 2
-                    if sorted_term_info[index] < term:
-                        low = index + 1
-                    elif sorted_term_info[index] > term:
-                        high = index - 1
-                    else:
-                        break
-
-                for i in range(self.file_location_step):
-                    if self.term_info[sorted_term_info[index-i]][1]:
-                        # previous term has file location
-                        term_location = self.term_info[sorted_term_info[index-i]][1] + i
-                        break
-
-                with self.open_merge_file(term_file.replace(".gz", ""), "r") as f:
-                    for i in range(term_location - 1):
-                        f.readline()
-
-                    while (line := f.readline()):
-
-                        if self.positional:
-                            # TODO: positions are not being used
-                            term_r, *postings = line.strip().split(" ")
-                            postings = [pos.split(',')[:2] for pos in postings]
-                        else:
-                            term_r, *postings = line.strip().split(" ")
-                            postings = [pos.split(',') for pos in postings]
-
-                        term_r, idf = term_r.split(',')
-
-                        if term == term_r:
-                            weights = [pos[1] for pos in postings]
-                            postings = [pos[0] for pos in postings]
-                            return idf, weights, postings
+                term_location = self.__get_term_location(term)
+                return self.__get_term_info_from_file(term, term_file, term_location - 1)
             else:
-                with self.open_merge_file(term_file.replace(".gz", ""), "r") as f:
-                    for line in f:
-                        if self.positional:
-                            term_r, *postings = f.readline().strip().split(" ")
-                            postings = [pos.split(',')[:2] for pos in postings]
-                        else:
-                            term_r, *postings = line.strip().split(" ")
-                            postings = [pos.split(',') for pos in postings]
-
-                        term_r, idf = term_r.split(',')
-
-                        if term_r == term:
-                            weights = [pos[1] for pos in postings]
-                            postings = [pos[0] for pos in postings]
-                            return idf, weights, postings
+                return self.__get_term_info_from_file(term, term_file)
         else:
-            logging.error(f"An error occured when searching for the term: {term}")
+            logging.error(
+                f"An error occured when searching for the term: {term}")
             exit(1)
 
     def clear_blocks(self):
         """Remove blocks folder."""
-        
+
         logging.info("Removing unused blocks")
 
         if not os.path.exists(f"{self.merge_dir}block/"):
-            logging.error("Block directory does not exist. Could not remove blocks.")
+            logging.error(
+                "Block directory does not exist. Could not remove blocks.")
             exit(1)
 
         blocks = glob.glob(f"{self.merge_dir}block/block*.txt")
@@ -336,7 +334,7 @@ class Indexer:
 
     def open_file_to_index(self, filename):
         """Open and return the dataset file."""
-        #FIXME: what
+        # FIXME: what
         try:
             f = open(filename, "r")
             f.readline()  # skip header
@@ -356,12 +354,12 @@ class Indexer:
 
     def open_merge_file(self, filename, mode="w"):
         """Open and return a index file."""
-        # FIXME: dont like that i need to remove .gz above, change this maybe
         if self.save_zip:
-            f = gzip.open(filename + ".gz", mode + "t")
-        else:
-            f = open(filename, mode)
-        return f
+            filename += ".gz"
+
+        if filename.endswith(".gz"):
+            return gzip.open(filename + ".gz", mode + "t")
+        return open(filename, mode)
 
     def merge_block_disk(self):
         """Merge all blocks in disk."""
@@ -400,8 +398,8 @@ class Indexer:
                                 doc = doc_str.split(',', 1)[0]
                                 # doc_lst[i] += ',' + self.term_doc_weights[term][doc]
                                 n = len(doc)
-                                doc_lst[i] = (doc_str[:n] + ',' + 
-                                    str(self.term_doc_weights[term][doc]) + doc_str[n:])
+                                doc_lst[i] = (doc_str[:n] + ',' +
+                                              str(self.term_doc_weights[term][doc]) + doc_str[n:])
                         terms.setdefault(term, set()).update(doc_lst)
                     last_terms[b] = term
                 b += 1
@@ -443,13 +441,14 @@ class Indexer:
     def __get_new_doc_id(self, doc):
 
         # FIXME: change this to use letters and numbers
+        # FIXME: __doc_id_cnt is the same as n_doc_indexed
         doc_id = str(self.__doc_id_cnt)
         self.doc_ids[doc_id] = doc
         self.__doc_id_cnt += 1
         return doc_id
 
     def __calculate_ranking_info(self, terms, doc):
-        
+
         if self.ranking == "VS":
             # here its done the l where the frequency of a term in this document is obtained
             temp = [term for term, pos in terms]
@@ -466,13 +465,12 @@ class Indexer:
                 self.term_doc_weights[term][doc] *= cos_norm
 
         elif self.ranking == "BM25":
-            
+
             temp = [term for term, pos in terms]
             self.document_lens[doc] = len(terms)
             for term in set(temp):
                 self.term_frequency.setdefault(term, {})
                 self.term_frequency[term][doc] = temp.count(term)
-
 
     def index_terms(self, terms, doc):
         """
@@ -485,7 +483,7 @@ class Indexer:
 
         if self.rename_doc:
             doc = self.__get_new_doc_id(doc)
-        
+
         # FIXME: idk if this works inside this function
         self.__calculate_ranking_info(terms, doc)
 
@@ -511,12 +509,12 @@ class Indexer:
         with self.open_file_to_index(filename) as f:
             while f:
                 line = f.readline()
-                
+
                 # writes block to disk when there are more postings than the threshold
                 # or when the file ends
-                if len(line) == 0 or self.__post_cnt >= self.block_threshold: 
+                if len(line) == 0 or self.__post_cnt >= self.block_threshold:
                     self.write_block_disk()
-                    #break # FIXME: if tokenize does not return anything it will continue 
+                    # break # FIXME: if tokenize does not return anything it will continue
                     # meaning that it will not do anything on the next line because
                     # it leaves the while, so the break might not be necessary
 
@@ -527,7 +525,7 @@ class Indexer:
 
                 self.index_terms(terms, doc)
                 self.n_doc_indexed += 1
-            
+
         self.__calculate_idf()
         self.merge_block_disk()
         self.write_term_info_disk()
@@ -543,21 +541,23 @@ class Indexer:
             self.idf[term] = idf
 
     def __calculate_ci(self):
-        # FIXME: 
+        # FIXME:
         # add k1 and b to the parameters
-        
-        k1  = 1 
+
+        k1 = 1
         b = 1
         self.term_doc_weights = {}     # {term : {doc: ci}}
-        avdl = sum(self.document_lens.values())/len(self.document_lens) # TODO: this is slow
-        
+        avdl = sum(self.document_lens.values()) / \
+            len(self.document_lens)  # TODO: this is slow
+
         for term in self.term_frequency:
             idf = self.idf[term]
-            
+
             for doc in self.term_frequency[term]:
                 term_frequency = self.term_frequency[term][doc]
                 document_len = self.document_lens[doc]
-                
-                ci = idf * (k1 + 1) * term_frequency / (k1 * ((1 - b) + b * document_len/avdl) + term_frequency)
+
+                ci = idf * (k1 + 1) * term_frequency / (k1 *
+                                                        ((1 - b) + b * document_len/avdl) + term_frequency)
                 self.term_doc_weights.setdefault(term, {})
-                self.term_doc_weights[term][doc] = ci           
+                self.term_doc_weights[term][doc] = ci

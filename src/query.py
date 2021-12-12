@@ -11,8 +11,7 @@ class Query:
     def search_file(self, filename):
         if not os.path.exists("./queries"):
             os.mkdir("./queries")
-
-        with open(filename, "r") as f:
+        with open(filename, "r") as f:                
             for i, line in enumerate(f):
                 results = self.search(line)
                 with open("./queries/query" + str(i+1) + ".txt", "w+") as q:
