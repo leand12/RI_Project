@@ -3,6 +3,26 @@
 import math
 import logging
 import os
+
+
+class Ranking:
+    
+    def __init__(self, name, p1, p2):
+        self.name = name
+        self.p1 = p1
+        self.p2 = p2
+
+class VS(Ranking):
+
+    def __init__(self, p1="lnc", p2="ltc", **ignore):
+        super().__init__("VS", p1, p2)
+
+class BM25(Ranking):
+    
+    def __init__(self, k1=1.2, b=1, **ignore):
+        super().__init__("BM25", k1, b)
+
+
 class Query:
 
     def __init__(self, indexer):

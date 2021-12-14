@@ -11,21 +11,19 @@ import glob
 import gzip
 from tokenizer import Tokenizer
 from utils import convert_size, get_directory_size
-
+from query import Ranking, BM25, VS 
 
 class Indexer:
 
     def __init__(self, tokenizer=Tokenizer(), positional=False, save_zip=False, rename_doc=False, file_location_step=0,
-                 block_threshold=1_000_000, merge_threshold=1_000_000, merge_chunk_size=1000,
-                 block_dir="block/", merge_dir="indexer/", **ignore):
+                 block_threshold=1_000_000, merge_threshold=1_000_000, merge_chunk_size=1000, 
+                 ranking=None, merge_dir="indexer/", **ignore):
 
         self.positional = positional
         self.index = {}             # {term: {doc: [pos]}} || {term: [docs]}
         self.term_info = {}         # {term: [df, file_loc]}
 
         path, _ = os.path.split(os.path.abspath(__file__))
-        self.block_dir = block_dir if os.path.isabs(
-            block_dir) else path + "/" + block_dir
         self.merge_dir = merge_dir if os.path.isabs(
             merge_dir) else path + "/" + merge_dir
 
@@ -38,13 +36,14 @@ class Indexer:
 
         self.save_zip = save_zip
 
-        self.ranking = "VS"
+        self.ranking = ranking         # ranking object
 
+        self.idf = {}
+        
         # VS
         self.n_doc_indexed = 0
         self.term_doc_weights = {}
-        self.idf = {}
-
+        
         # BM25
         self.document_lens = {}     # saves the number of words for each document
         self.term_frequency = {}    # save
@@ -90,9 +89,16 @@ class Indexer:
 
             indexer_data = data.get("indexer") or {}
             tokenizer_data = data.get("tokenizer") or {}
+            ranking_data = data.get("ranking") or {}
 
+            ranking = None
+            if ranking_data.get("name") == "BM25":
+                ranking = BM25(**ranking_data)                
+            elif ranking_data.get("name") == "VS":    
+                ranking = VS(**ranking_data)
+                
             tokenizer = Tokenizer(**tokenizer_data)
-            indexer = Indexer(tokenizer=tokenizer, **indexer_data)
+            indexer = Indexer(ranking=ranking, tokenizer=tokenizer, **indexer_data)
 
             return indexer
 
@@ -109,7 +115,6 @@ class Indexer:
                 "block_threshold": 1_000_000,
                 "merge_threshold": 1_000_000,
                 "merge_chunk_size": 1000,
-                "block_dir": "block/",
                 "merge_dir": "indexer/",
             }
             tokenizer = {
@@ -120,7 +125,13 @@ class Indexer:
                 "contractions_file": None,
                 "stemmer": True
             }
-            data = {"indexer": indexer, "tokenizer": tokenizer}
+            ranking = {
+                "name": "VS",
+                "p1": "lnc",
+                "p2": "ltc"
+            }
+            
+            data = {"ranking": ranking, "indexer": indexer, "tokenizer": tokenizer}
             json.dump(data, f, indent=2)
 
     def write_block_disk(self):
@@ -168,7 +179,6 @@ class Indexer:
                 "block_threshold": self.block_threshold,
                 "merge_threshold": self.merge_threshold,
                 "merge_chunk_size": self.merge_chunk_size,
-                "block_dir": self.block_dir,
                 "merge_dir": self.merge_dir,
             }
             tokenizer = {
@@ -179,8 +189,11 @@ class Indexer:
                 "contractions_file": self.tokenizer.contractions_file,
                 "stemmer": True if self.tokenizer.stemmer else False
             }
-
             data = {"indexer": indexer, "tokenizer": tokenizer}
+
+            if self.ranking:
+                data["ranking"] = self.ranking.__dict__
+
             json.dump(data, f, indent=2)
 
     def write_term_info_disk(self):
@@ -192,8 +205,7 @@ class Indexer:
             # term posting_size file_location_step
             # FIXME: se tivessemos o term info como objeto era mais facil de escrever em ficheiros XD
             for term in sorted(self.term_info):
-                f.write(
-                    f"{term} {' '.join(str(i)for i in self.term_info[term]).strip()}\n")
+                f.write(f"{term} {' '.join(str(i)for i in self.term_info[term]).strip()}\n")
 
     def read_term_info_memory(self):
         """Reads term information from metadata."""
@@ -392,13 +404,12 @@ class Indexer:
                     for doc in docs:
                         line = doc.strip().split(' ')
                         term, doc_lst = line[0], line[1:]
-                        if self.ranking:  # self.ranking: # FIXME:
+                        if self.ranking:
                             for i, doc_str in enumerate(doc_lst):
                                 doc = doc_str.split(',', 1)[0]
                                 # doc_lst[i] += ',' + self.term_doc_weights[term][doc]
                                 n = len(doc)
-                                doc_lst[i] = (doc_str[:n] + ',' +
-                                              str(self.term_doc_weights[term][doc]) + doc_str[n:])
+                                doc_lst[i] = f"{doc_str[:n]},{self.term_doc_weights[term][doc]}{doc_str[n:]}"
                         terms.setdefault(term, set()).update(doc_lst)
                     last_terms[b] = term
                 b += 1
@@ -446,7 +457,8 @@ class Indexer:
 
     def __calculate_ranking_info(self, terms, doc):
 
-        if self.ranking == "VS":
+        if self.ranking.name == "VS":
+            # FIXME: change to allow multiple config
             # here its done the l where the frequency of a term in this document is obtained
             temp = [term for term, pos in terms]
             cos_norm = 0
@@ -461,7 +473,7 @@ class Indexer:
             for term in set(temp):
                 self.term_doc_weights[term][doc] *= cos_norm
 
-        elif self.ranking == "BM25":
+        elif self.ranking.name == "BM25":
 
             temp = [term for term, pos in terms]
             self.document_lens[doc] = len(terms)
@@ -537,11 +549,7 @@ class Indexer:
             self.idf[term] = idf
 
     def __calculate_ci(self):
-        # FIXME:
-        # add k1 and b to the parameters
 
-        k1 = 1
-        b = 1
         self.term_doc_weights = {}     # {term : {doc: ci}}
         avdl = sum(self.document_lens.values()) / \
             len(self.document_lens)  # TODO: this is slow
@@ -553,7 +561,7 @@ class Indexer:
                 term_frequency = self.term_frequency[term][doc]
                 document_len = self.document_lens[doc]
 
-                ci = idf * (k1 + 1) * term_frequency / (k1 *
-                                                        ((1 - b) + b * document_len/avdl) + term_frequency)
+                ci = idf * (self.ranking.k1 + 1) * term_frequency / (self.ranking.k1 *
+                    ((1 - self.ranking.b) + self.ranking.b * document_len/avdl) + term_frequency)
                 self.term_doc_weights.setdefault(term, {})
                 self.term_doc_weights[term][doc] = ci
