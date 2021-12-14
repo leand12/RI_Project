@@ -3,10 +3,10 @@
     "positional": false,
     "save_zip": true,
     "rename_doc": false,
-    "file_location": false,
-    "file_location_step": 100,
+    "file_location": true,
+    "file_location_step": 0,
     "block_threshold": 1000000,
-    "merge_threshold": 5000,
+    "merge_threshold": 1000000,
     "merge_chunk_size": 1000,
     "block_dir": "block/",
     "merge_dir": "indexer/"

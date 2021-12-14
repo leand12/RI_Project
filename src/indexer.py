@@ -15,8 +15,7 @@ from utils import convert_size, get_directory_size
 
 class Indexer:
 
-    def __init__(self, tokenizer=Tokenizer(), positional=False, save_zip=False, rename_doc=False,
-                 file_location=False, file_location_step=100,
+    def __init__(self, tokenizer=Tokenizer(), positional=False, save_zip=False, rename_doc=False, file_location_step=0,
                  block_threshold=1_000_000, merge_threshold=1_000_000, merge_chunk_size=1000,
                  block_dir="block/", merge_dir="indexer/", **ignore):
 
@@ -56,7 +55,6 @@ class Indexer:
         self.rename_doc = rename_doc
 
         # FILE LOCATION
-        self.file_location = file_location
         self.file_location_step = file_location_step
         self.__post_cnt = 0
 
@@ -107,8 +105,7 @@ class Indexer:
                 "positional": False,
                 "save_zip": False,
                 "rename_doc": False,
-                "file_location": False,
-                "file_location_step": 100,
+                "file_location_step": 0,
                 "block_threshold": 1_000_000,
                 "merge_threshold": 1_000_000,
                 "merge_chunk_size": 1000,
@@ -167,7 +164,6 @@ class Indexer:
                 "positional": self.positional,
                 "save_zip": self.save_zip,
                 "rename_doc": self.rename_doc,
-                "file_location": self.file_location,
                 "file_location_step": self.file_location_step,
                 "block_threshold": self.block_threshold,
                 "merge_threshold": self.merge_threshold,
@@ -193,7 +189,7 @@ class Indexer:
         logging.info("Writing # of postings for each term to disk")
         with open(self.merge_dir + ".metadata/term_info.txt", "w+") as f:
 
-            # term posting_size file_location
+            # term posting_size file_location_step
             # FIXME: se tivessemos o term info como objeto era mais facil de escrever em ficheiros XD
             for term in sorted(self.term_info):
                 f.write(
@@ -304,7 +300,7 @@ class Indexer:
 
         # search position on file
         if term_file != None:
-            if self.file_location:
+            if self.file_location_step:
                 term_location = self.__get_term_location(term)
                 return self.__get_term_info_from_file(term, term_file, term_location - 1)
             else:
@@ -434,7 +430,7 @@ class Indexer:
             for ti, t in enumerate(sorted_terms):
                 if threshold_term and t <= last_term:
                     f.write(f"{t},{self.idf[t]} {' '.join(sorted(terms[t]))}\n")
-                    if self.file_location and ti % self.file_location_step == 0:
+                    if self.file_location_step and ti % self.file_location_step == 0:
                         self.term_info[t][1] = ti + 1
                     del terms[t]
         
