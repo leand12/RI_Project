@@ -63,6 +63,9 @@ class Tokenizer:
     def tokenize(self, line):
         """Tokenize a document and return the terms position."""
 
+        if not line:
+            return None, None
+
         doc = line.split('\t')
         review = doc[Review.HEADLINE] + " " + doc[Review.BODY]
         review_id = doc[Review.ID]

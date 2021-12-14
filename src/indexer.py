@@ -39,6 +39,8 @@ class Indexer:
 
         self.save_zip = save_zip
 
+        self.ranking = True
+
         # VS
         self.n_doc_indexed = 0
         self.term_doc_weights = {}
@@ -316,13 +318,13 @@ class Indexer:
         """Remove blocks folder."""
 
         logging.info("Removing unused blocks")
-
-        if not os.path.exists(f"{self.merge_dir}block/"):
+        block_dir = f"{self.merge_dir}block/"
+        if not os.path.exists(block_dir):
             logging.error(
                 "Block directory does not exist. Could not remove blocks.")
             exit(1)
 
-        blocks = glob.glob(f"{self.merge_dir}block/block*.txt")
+        blocks = glob.glob(f"{block_dir}block*.txt")
 
         for block in blocks:
             try:
@@ -330,7 +332,7 @@ class Indexer:
             except:
                 logging.error("Error removing block files")
 
-        os.rmdir(self.block_dir)
+        os.rmdir(block_dir)
 
     def open_file_to_index(self, filename):
         """Open and return the dataset file."""
@@ -366,7 +368,8 @@ class Indexer:
 
         if not os.path.exists(self.merge_dir):
             os.mkdir(self.merge_dir)
-            os.mkdir(self.merge_dir + ".metadata/")
+        if not os.path.exists(f"{self.merge_dir}.metadata/"):
+            os.mkdir(f"{self.merge_dir}.metadata/")
 
         # opens every block file and stores the file pointers in a list
         blocks = [open(block, "r")
@@ -512,9 +515,8 @@ class Indexer:
                 # or when the file ends
                 if len(line) == 0 or self.__post_cnt >= self.block_threshold:
                     self.write_block_disk()
-                    # break # FIXME: if tokenize does not return anything it will continue
-                    # meaning that it will not do anything on the next line because
-                    # it leaves the while, so the break might not be necessary
+                if not line:
+                    break
 
                 terms, doc = self.tokenizer.tokenize(line)
 
