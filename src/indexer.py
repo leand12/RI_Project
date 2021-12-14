@@ -354,11 +354,11 @@ class Indexer:
 
     def open_merge_file(self, filename, mode="w"):
         """Open and return a index file."""
-        if self.save_zip:
+        if self.save_zip and not filename.endswith(".gz"):
             filename += ".gz"
 
         if filename.endswith(".gz"):
-            return gzip.open(filename + ".gz", mode + "t")
+            return gzip.open(filename, mode + "t")
         return open(filename, mode)
 
     def merge_block_disk(self):
@@ -418,25 +418,23 @@ class Indexer:
 
             if total >= self.merge_threshold:
                 # writes the terms to the file when the terms do not go pass a threshold
-                with self.open_merge_file(self.merge_dir + sorted_terms[0] + " " + term + ".txt") as f:
-                    for ti, t in enumerate(sorted_terms):
-                        if t <= term:
-                            f.write(
-                                t + "," + str(self.idf[t]) + " " + " ".join(sorted(terms[t])) + "\n")
-                            if self.file_location and ti % self.file_location_step == 0:
-                                self.term_info[t][1] = ti + 1
-                            del terms[t]
+                self.__store_term_merged_file(terms, sorted_terms, term, True)
             elif not blocks:
                 # this will write the terms left in the last block
-                with self.open_merge_file(self.merge_dir + sorted_terms[0] + " " + term + ".txt") as f:
-                    for ti, t in enumerate(sorted_terms):
-                        f.write(
-                            t + "," + str(self.idf[t]) + " " + " ".join(sorted(terms[t])) + "\n")
-                        if self.file_location and ti % self.file_location_step == 0:
-                            self.term_info[t][1] = ti + 1
-                        del terms[t]
+                self.__store_term_merged_file(terms, sorted_terms, term)
 
         self.clear_blocks()
+
+    def __store_term_merged_file(self, terms, sorted_terms, last_term, threshold_term=False):
+        
+        with self.open_merge_file(f"{self.merge_dir}{sorted_terms[0]} {last_term}.txt") as f:
+            for ti, t in enumerate(sorted_terms):
+                if threshold_term and t <= last_term:
+                    f.write(f"{t},{self.idf[t]} {' '.join(sorted(terms[t]))}\n")
+                    if self.file_location and ti % self.file_location_step == 0:
+                        self.term_info[t][1] = ti + 1
+                    del terms[t]
+        
 
     def __get_new_doc_id(self, doc):
 
