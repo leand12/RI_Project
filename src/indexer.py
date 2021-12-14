@@ -38,7 +38,7 @@ class Indexer:
 
         self.save_zip = save_zip
 
-        self.ranking = True
+        self.ranking = "VS"
 
         # VS
         self.n_doc_indexed = 0
@@ -145,7 +145,7 @@ class Indexer:
                     write = f"{term} {' '.join([doc + ',' + ','.join(self.index[term][doc]) for doc in self.index[term]])}\n"
                 else:
                     # term doc1 doc2
-                    write = f"{term} {''.join(self.index[term])}\n"
+                    write = f"{term} {' '.join(self.index[term])}\n"
 
                 f.write(write)
                 # FIXME: maybe meter isto num objeto?
@@ -369,7 +369,7 @@ class Indexer:
 
         # opens every block file and stores the file pointers in a list
         blocks = [open(block, "r")
-                  for block in glob.glob(self.block_dir + "*")]
+                  for block in glob.glob(f"{self.merge_dir}block/*")]
         terms = {}
         # keeps the last term for every block
         last_terms = [None for _ in range(len(blocks))]
@@ -392,7 +392,7 @@ class Indexer:
                     for doc in docs:
                         line = doc.strip().split(' ')
                         term, doc_lst = line[0], line[1:]
-                        if True:  # self.ranking: # FIXME:
+                        if self.ranking:  # self.ranking: # FIXME:
                             for i, doc_str in enumerate(doc_lst):
                                 doc = doc_str.split(',', 1)[0]
                                 # doc_lst[i] += ',' + self.term_doc_weights[term][doc]
@@ -428,7 +428,7 @@ class Indexer:
         
         with self.open_merge_file(f"{self.merge_dir}{sorted_terms[0]} {last_term}.txt") as f:
             for ti, t in enumerate(sorted_terms):
-                if threshold_term and t <= last_term:
+                if not threshold_term or t <= last_term:
                     f.write(f"{t},{self.idf[t]} {' '.join(sorted(terms[t]))}\n")
                     if self.file_location_step and ti % self.file_location_step == 0:
                         self.term_info[t][1] = ti + 1
