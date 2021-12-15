@@ -87,9 +87,9 @@ class Indexer:
         with open(filename, "r") as f:
             data = json.loads(f.read())
 
-            indexer_data = data.get("indexer") or {}
-            tokenizer_data = data.get("tokenizer") or {}
-            ranking_data = data.get("ranking") or {}
+            indexer_data = data.get("indexer", {})
+            tokenizer_data = data.get("tokenizer", {})
+            ranking_data = data.get("ranking", {})
 
             ranking = None
             if ranking_data.get("name") == "BM25":
@@ -373,7 +373,7 @@ class Indexer:
 
     def merge_block_disk(self):
         """Merge all blocks in disk."""
-
+        logging.info("Merge Blocks disk...")
         if not os.path.exists(self.merge_dir):
             os.mkdir(self.merge_dir)
         if not os.path.exists(f"{self.merge_dir}.metadata/"):
@@ -409,6 +409,8 @@ class Indexer:
                                 doc = doc_str.split(',', 1)[0]
                                 # doc_lst[i] += ',' + self.term_doc_weights[term][doc]
                                 n = len(doc)
+                                # if term == '000o':
+                                print(self.term_doc_weights)
                                 doc_lst[i] = f"{doc_str[:n]},{self.term_doc_weights[term][doc]}{doc_str[n:]}"
                         terms.setdefault(term, set()).update(doc_lst)
                     last_terms[b] = term
@@ -534,7 +536,11 @@ class Indexer:
                 self.index_terms(terms, doc)
                 self.n_doc_indexed += 1
 
-        self.__calculate_idf()
+        if self.ranking:
+            self.__calculate_idf()
+            if self.ranking.name == "BM25":
+                self.__calculate_ci()
+
         self.merge_block_disk()
         self.write_term_info_disk()
         if self.rename_doc:
@@ -543,7 +549,9 @@ class Indexer:
 
     def __calculate_idf(self):
 
+        print()
         for term in self.term_doc_weights:
+            print("__calculate_idf", term)
             document_frequency = self.term_info[term][0]
             idf = math.log10(self.n_doc_indexed / document_frequency)
             self.idf[term] = idf
@@ -555,6 +563,7 @@ class Indexer:
             len(self.document_lens)  # TODO: this is slow
 
         for term in self.term_frequency:
+            print(term, self.idf)
             idf = self.idf[term]
 
             for doc in self.term_frequency[term]:
