@@ -11,7 +11,7 @@ import glob
 import gzip
 from tokenizer import Tokenizer
 from utils import convert_size, get_directory_size
-from query import Ranking, BM25, VS 
+from query import BM25, VSM 
 
 class Indexer:
 
@@ -94,8 +94,8 @@ class Indexer:
             ranking = None
             if ranking_data.get("name") == "BM25":
                 ranking = BM25(**ranking_data)                
-            elif ranking_data.get("name") == "VS":    
-                ranking = VS(**ranking_data)
+            elif ranking_data.get("name") == "VSM":    
+                ranking = VSM(**ranking_data)
                 
             tokenizer = Tokenizer(**tokenizer_data)
             indexer = Indexer(ranking=ranking, tokenizer=tokenizer, **indexer_data)
@@ -373,7 +373,7 @@ class Indexer:
 
     def merge_block_disk(self):
         """Merge all blocks in disk."""
-        logging.info("Merge Blocks disk...")
+        logging.info("Merge Block disk")
         if not os.path.exists(self.merge_dir):
             os.mkdir(self.merge_dir)
         if not os.path.exists(f"{self.merge_dir}.metadata/"):
@@ -459,7 +459,7 @@ class Indexer:
 
     def __calculate_ranking_info(self, terms, doc):
 
-        if self.ranking.name == "VS":
+        if self.ranking.name == "VSM":
             # FIXME: change to allow multiple config
             # here its done the l where the frequency of a term in this document is obtained
             temp = [term for term, pos in terms]
@@ -495,7 +495,6 @@ class Indexer:
         if self.rename_doc:
             doc = self.__get_new_doc_id(doc)
 
-        # FIXME: idk if this works inside this function
         self.__calculate_ranking_info(terms, doc)
 
         # terms -> List[Tuple(term, pos)]
