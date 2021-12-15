@@ -1,7 +1,7 @@
 {
   "indexer": {
     "positional": false,
-    "save_zip": true,
+    "save_zip": false,
     "rename_doc": false,
     "file_location": true,
     "file_location_step": 0,

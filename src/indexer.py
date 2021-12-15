@@ -11,12 +11,13 @@ import glob
 import gzip
 from tokenizer import Tokenizer
 from utils import convert_size, get_directory_size
-from query import BM25, VSM 
+from query import BM25, VSM
+
 
 class Indexer:
 
     def __init__(self, tokenizer=Tokenizer(), positional=False, save_zip=False, rename_doc=False, file_location_step=0,
-                 block_threshold=1_000_000, merge_threshold=1_000_000, merge_chunk_size=1000, 
+                 block_threshold=1_000_000, merge_threshold=1_000_000, merge_chunk_size=1000,
                  ranking=None, merge_dir="indexer/", **ignore):
 
         self.positional = positional
@@ -39,11 +40,11 @@ class Indexer:
         self.ranking = ranking         # ranking object
 
         self.idf = {}
-        
+
         # VS
         self.n_doc_indexed = 0
         self.term_doc_weights = {}
-        
+
         # BM25
         self.document_lens = {}     # saves the number of words for each document
         self.term_frequency = {}    # save
@@ -93,12 +94,13 @@ class Indexer:
 
             ranking = None
             if ranking_data.get("name") == "BM25":
-                ranking = BM25(**ranking_data)                
-            elif ranking_data.get("name") == "VSM":    
+                ranking = BM25(**ranking_data)
+            elif ranking_data.get("name") == "VSM":
                 ranking = VSM(**ranking_data)
-                
+
             tokenizer = Tokenizer(**tokenizer_data)
-            indexer = Indexer(ranking=ranking, tokenizer=tokenizer, **indexer_data)
+            indexer = Indexer(
+                ranking=ranking, tokenizer=tokenizer, **indexer_data)
 
             return indexer
 
@@ -130,8 +132,9 @@ class Indexer:
                 "p1": "lnc",
                 "p2": "ltc"
             }
-            
-            data = {"ranking": ranking, "indexer": indexer, "tokenizer": tokenizer}
+
+            data = {"ranking": ranking,
+                    "indexer": indexer, "tokenizer": tokenizer}
             json.dump(data, f, indent=2)
 
     def write_block_disk(self):
@@ -160,8 +163,8 @@ class Indexer:
 
                 f.write(write)
                 # FIXME: maybe meter isto num objeto?
-                self.term_info.setdefault(term, [0, ''])[
-                    0] += len(self.index[term])
+                self.term_info.setdefault(
+                    term, [0, ''])[0] += len(self.index[term])
 
             self.index = {}
 
@@ -437,7 +440,7 @@ class Indexer:
         self.clear_blocks()
 
     def __store_term_merged_file(self, terms, sorted_terms, last_term, threshold_term=False):
-        
+
         with self.open_merge_file(f"{self.merge_dir}{sorted_terms[0]} {last_term}.txt") as f:
             for ti, t in enumerate(sorted_terms):
                 if not threshold_term or t <= last_term:
@@ -445,7 +448,6 @@ class Indexer:
                     if self.file_location_step and ti % self.file_location_step == 0:
                         self.term_info[t][1] = ti + 1
                     del terms[t]
-        
 
     def __get_new_doc_id(self, doc):
 
@@ -505,8 +507,8 @@ class Indexer:
                     .append(pos)
             else:
                 # index -> Dict[term: List[doc]]
-                self.index.setdefault(term, [])
-                self.index[term].append(doc)
+                self.index.setdefault(term, set()) \
+                    .add(doc)
         self.__post_cnt += len(terms)
 
     def index_file(self, filename):
@@ -521,7 +523,7 @@ class Indexer:
 
                 # writes block to disk when there are more postings than the threshold
                 # or when the file ends
-                if len(line) == 0 or self.__post_cnt >= self.block_threshold:
+                if not line or self.__post_cnt >= self.block_threshold:
                     self.write_block_disk()
                 if not line:
                     break

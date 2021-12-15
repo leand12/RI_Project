@@ -108,3 +108,14 @@ if __name__ == "__main__":
         logging.info(f"Your search - {search} - did not match any documents")
 
     # query.search_file("queries.txt")
+
+
+"""
+TODO:
+    fix do bm25
+    file_location quando e igual a 1
+    guardar o idf no dicionario em vez do posting list
+    opcoes para o tf-idf
+    ver tempos das queries e tal
+    readme
+"""

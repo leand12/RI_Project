@@ -59,14 +59,14 @@ class Query:
         
         scores = {}
         cos_norm = 0
-        for term in set(terms):
+        for term in terms:
             if (term_info := self.indexer.read_posting_lists(term)):    
                 idf, weights, postings = term_info
                 lt = 1 + math.log10(terms.count(term)) * float(idf)
                 cos_norm += (lt) ** 2
                 for i, doc in enumerate(postings):
                     scores.setdefault(doc, 0)
-                    scores[doc] += float(weights[i]) * (lt)
+                    scores[doc] += float(weights[i]) * (lt) * terms.count(term)
 
         if scores:
             cos_norm = 1 / math.sqrt(cos_norm)
@@ -84,7 +84,7 @@ class Query:
                 
                 for i, doc in enumerate(postings):
                     scores.setdefault(doc, 0)
-                    scores[doc] += float(weights[i])            
+                    scores[doc] += float(weights[i]) * terms.count(term)
 
         if scores:
             return sorted(scores.items(), key=lambda x: -x[1])[:10]        
