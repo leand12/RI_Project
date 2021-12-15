@@ -14,6 +14,26 @@ from utils import convert_size, get_directory_size
 from query import BM25, VSM
 
 
+class TermInfo():
+
+    def __init__(self, posting_size=0, position=None, idf=None):
+        self.posting_size = posting_size
+        self.position = position or None
+        self.idf = idf or None
+
+    def __str__(self):
+        return f"{self.posting_size},{self.position or ''},{self.idf or ''}"
+
+    def __repr__(self):
+        return self.__str__()
+
+    @staticmethod
+    def create(line):
+        term, posting_size, position, idf = line.strip().split(',')
+        return TermInfo(int(posting_size), 
+            position and int(position), idf and float(idf))
+    
+
 class Indexer:
 
     def __init__(self, tokenizer=Tokenizer(), positional=False, save_zip=False, rename_doc=False, file_location_step=0,
@@ -162,9 +182,8 @@ class Indexer:
                     write = f"{term} {' '.join(self.index[term])}\n"
 
                 f.write(write)
-                # FIXME: maybe meter isto num objeto?
                 self.term_info.setdefault(
-                    term, [0, ''])[0] += len(self.index[term])
+                    term, TermInfo()).posting_size += len(self.index[term])
 
             self.index = {}
 
@@ -208,7 +227,7 @@ class Indexer:
             # term posting_size file_location_step
             # FIXME: se tivessemos o term info como objeto era mais facil de escrever em ficheiros XD
             for term in sorted(self.term_info):
-                f.write(f"{term} {' '.join(str(i)for i in self.term_info[term]).strip()}\n")
+                f.write(f"{term},{self.term_info[term]}\n")
 
     def read_term_info_memory(self):
         """Reads term information from metadata."""
@@ -218,9 +237,8 @@ class Indexer:
 
         with open(f"{self.merge_dir}.metadata/term_info.txt", "r") as f:
             for line in f:
-                term, *rest = line.strip().split(" ")
-                self.term_info[term] = [
-                    int(i) for i in rest] + ([''] if len(rest) < 2 else [])
+                term, *rest = line.strip().split(',')
+                self.term_info[term] = TermInfo.create(line)
 
     def write_doc_ids(self):
         """Saves the dict containing the new ids for the documents as metadata."""
@@ -270,9 +288,10 @@ class Indexer:
                 break
 
         for i in range(self.file_location_step):
-            if self.term_info[sorted_term_info[index-i]][1]:
+            pos = self.term_info[sorted_term_info[index-i]].position
+            if pos:
                 # previous term has file location
-                return self.term_info[sorted_term_info[index-i]][1] + i
+                return pos + i
 
     def __get_term_info_from_file(self, term, file, skip=0):
 
@@ -446,7 +465,7 @@ class Indexer:
                 if not threshold_term or t <= last_term:
                     f.write(f"{t},{self.idf[t]} {' '.join(sorted(terms[t]))}\n")
                     if self.file_location_step and ti % self.file_location_step == 0:
-                        self.term_info[t][1] = ti + 1
+                        self.term_info[t].pos = ti + 1
                     del terms[t]
 
     def __get_new_doc_id(self, doc):
@@ -550,7 +569,7 @@ class Indexer:
     def __calculate_idf(self):
 
         for term in self.term_info:
-            document_frequency = self.term_info[term][0]
+            document_frequency = self.term_info[term].posting_size
             idf = math.log10(self.n_doc_indexed / document_frequency)
             self.idf[term] = idf
 
