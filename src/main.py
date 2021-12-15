@@ -96,7 +96,7 @@ if __name__ == "__main__":
     query = Query(indexer)
 
     search = input("Search: ")
-    """
+
     start = time.perf_counter()
     results = query.search(search)
 
@@ -106,5 +106,5 @@ if __name__ == "__main__":
         logging.info(results)
     else:
         logging.info(f"Your search - {search} - did not match any documents")
-    """
-    query.search_file("queries.txt")
+
+    # query.search_file("queries.txt")

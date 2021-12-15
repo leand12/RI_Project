@@ -410,7 +410,6 @@ class Indexer:
                                 # doc_lst[i] += ',' + self.term_doc_weights[term][doc]
                                 n = len(doc)
                                 # if term == '000o':
-                                print(self.term_doc_weights)
                                 doc_lst[i] = f"{doc_str[:n]},{self.term_doc_weights[term][doc]}{doc_str[n:]}"
                         terms.setdefault(term, set()).update(doc_lst)
                     last_terms[b] = term
@@ -548,9 +547,7 @@ class Indexer:
 
     def __calculate_idf(self):
 
-        print()
-        for term in self.term_doc_weights:
-            print("__calculate_idf", term)
+        for term in self.term_info:
             document_frequency = self.term_info[term][0]
             idf = math.log10(self.n_doc_indexed / document_frequency)
             self.idf[term] = idf
@@ -562,7 +559,6 @@ class Indexer:
             len(self.document_lens)  # TODO: this is slow
 
         for term in self.term_frequency:
-            print(term, self.idf)
             idf = self.idf[term]
 
             for doc in self.term_frequency[term]:

@@ -20,8 +20,8 @@
       "stemmer": false
   },
   "ranking": {
-    "name": "VS",
-    "p1": "lnc",
-    "p2": "ltc"
+    "name": "BM25",
+    "b": 0.75,
+    "k1": 1.2
   }
 }
