@@ -272,7 +272,9 @@ class Indexer:
 
     def __get_term_location(self, term):
 
-        # TODO: add case when file_location_step is 1 and it is 0(1) to search for it
+        if self.file_location_step == 1:
+            return self.term_info[term].position
+        
         sorted_term_info = sorted(self.term_info.keys())
 
         low = index = 0
@@ -478,27 +480,31 @@ class Indexer:
         return doc_id
 
     def __calculate_ranking_info(self, terms, doc):
+        temp = [term for term, pos in terms]
 
-        if self.ranking.name == "VSM":
-            # FIXME: change to allow multiple config
-            # here its done the l where the frequency of a term in this document is obtained
-            temp = [term for term, pos in terms]
+        if self.ranking.name == "VSM": 
             cos_norm = 0
+
             for term in set(temp):
                 self.term_doc_weights.setdefault(term, {})
-                self.term_doc_weights[term][doc] = 1 + \
-                    math.log10(temp.count(term))
+                if self.ranking.p1[0] == "l":
+                    # l**
+                    self.term_doc_weights[term][doc] = 1 + math.log10(temp.count(term))
+                elif self.ranking.p1[0] == "n":
+                    # n**
+                    self.term_doc_weights[term][doc] = temp.count(term)
+                
                 cos_norm += self.term_doc_weights[term][doc]**2
-
-            # here its done the cossine normalization where the previous obtained weights
-            cos_norm = 1 / math.sqrt(cos_norm)
-            for term in set(temp):
-                self.term_doc_weights[term][doc] *= cos_norm
+            
+            if self.ranking.p1[2] == "c":
+                # **c
+                cos_norm = 1 / math.sqrt(cos_norm)
+                for term in set(temp):
+                    self.term_doc_weights[term][doc] *= cos_norm
 
         elif self.ranking.name == "BM25":
-
-            temp = [term for term, pos in terms]
             self.document_lens[doc] = len(terms)
+            
             for term in set(temp):
                 self.term_frequency.setdefault(term, {})
                 self.term_frequency[term][doc] = temp.count(term)

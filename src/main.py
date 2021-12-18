@@ -112,8 +112,6 @@ if __name__ == "__main__":
 
 """
 TODO:
-    file_location quando e igual a 1
-    opcoes para o tf-idf
     ver tempos das queries e tal
     readme
 """

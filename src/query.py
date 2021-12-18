@@ -4,7 +4,6 @@ import math
 import logging
 import os
 
-
 class Ranking:
 
     def __init__(self, name, p1, p2):
@@ -16,6 +15,17 @@ class Ranking:
 class VSM(Ranking):
 
     def __init__(self, p1="lnc", p2="ltc", **ignore):
+            
+        if len(p1) != 3 or p1[0] not in ('l', 'n') or p1[0] not in ('n') or  p1[0] not in ('c', 'n'):
+            logging.info(f"Configuration {p1} for the document is not implemented."
+                "Using default configuration: lnc")
+            p1 = "lnc"
+
+        if len(p2) != 3 or p2[0] not in ('l', 'n') or p2[0] not in ('n', 't') or  p2[0] not in ('c', 'n'):
+            logging.info(f"Configuration {p2} for the query is not implemented."
+                "Using default configuration: ltc")
+            p1 = "ltc"
+            
         super().__init__("VSM", p1, p2)
 
 
@@ -49,8 +59,6 @@ class Query:
         if not terms:
             assert False, "The provided query is not valid"
 
-        #sizes = [self.indexer.term_info[term][0] if self.indexer.term_info.get(term) else 0 for term in terms ]
-
         if self.indexer.ranking.name == "VSM":
             return self.tf_idf_score(terms)
         elif self.indexer.ranking.name == "BM25":
@@ -61,25 +69,38 @@ class Query:
 
         scores = {}
         cos_norm = 0
-        for term in terms:
+        for term in set(terms):
             if (term_info := self.indexer.read_posting_lists(term)):
                 idf, weights, postings = term_info
-                lt = 1 + math.log10(terms.count(term)) * float(idf)
+
+                tf = terms.count(term)  # n**
+                dc = 1                  # *n*
+
+                if self.indexer.ranking.p2[0] == 'l':
+                    # l**
+                    tf = 1 + math.log10(tf)
+
+                if self.indexer.ranking.p2[1] == 't':
+                    # *t*
+                    dc = float(idf)
+
+                lt = tf * dc
                 cos_norm += lt**2
                 for i, doc in enumerate(postings):
                     scores.setdefault(doc, 0)
                     scores[doc] += float(weights[i]) * lt * terms.count(term)
 
-        if scores:
-            cos_norm = 1 / math.sqrt(cos_norm)
-            for doc in scores:
-                scores[doc] *= cos_norm
+        if scores: 
+            if self.indexer.ranking.p2[2] == 'c':
+                # **c
+                cos_norm = 1 / math.sqrt(cos_norm)
+                for doc in scores:
+                    scores[doc] *= cos_norm
             return sorted(scores.items(), key=lambda x: -x[1])[:10]
 
     def bm25_score(self, terms):
 
         scores = {}
-        # FIXME: terms does not take into consideration if there are multiple repeated words
         for term in set(terms):
             if (term_info := self.indexer.read_posting_lists(term)):
                 idf, weights, postings = term_info
