@@ -57,6 +57,7 @@ def init_indexer(args):
                 search = input("Search: ")
             except EOFError:
                 # quit on CTRL+D
+                print()
                 break
 
             start = time.perf_counter()
@@ -74,98 +75,72 @@ def init_indexer(args):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
-        add_help=False,
-        usage="main.py [-h [{dataset,indexer}]] (-d FILE | -i DIR) [OPTIONS ...]",
         description='Document indexer using the SPIMI approach')
 
-    parser.add_argument('-h', '--help', nargs='?', choices=['dataset', 'indexer'],
-                        help='show this message and exit')
+    subparser = parser.add_subparsers()
 
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('-d', '--dataset', metavar='FILE',
+    d_parser = subparser.add_parser('dataset')
+    d_parser.add_argument('dataset', metavar='FILE',
                        help='create indexer from a file with the documents to index')
-    group.add_argument('-i', '--indexer', metavar='DIR',
+    d_parser.add_argument('-c', '--config', metavar='FILE',
+                        help='json file with the configurations to build the tokenizer and indexer'
+                        '(additional options will be ignored)')
+
+    group1 = d_parser.add_argument_group('indexer optional arguments')
+    group1.add_argument('--positional', action='store_true',
+                        help='save the terms\' positions in a document')
+    group1.add_argument('--save-zip', action='store_true',
+                        help='zip the output files of the indexer')
+    group1.add_argument('--doc-rename', action='store_true',
+                        help='rename document IDs for a more efficient space usage')
+    group1.add_argument('--file-location-step', metavar='STEP', type=int, nargs='?', default=1, const=0,
+                        help='store file location for terms step by step (const: %(const)s, default: %(default)s)')
+    group1.add_argument('--block-threshold', metavar='THRESHOLD', type=int, default=1_000_000,
+                        help='maximum number of documents that can be stored in a block (default: %(default)s)')
+    group1.add_argument('--merge-threshold', metavar='THRESHOLD', type=int, default=1_000_000,
+                        help='maximum number of documents that can be stored in a index (default: %(default)s)')
+    group1.add_argument('--merge-chunk-size', metavar='SIZE', type=int, default=1000,
+                        help='size of the block chunks read (default: %(default)s)')
+    group1.add_argument('--merge-dir', metavar='DIR', default="indexer/",
+                        help='source directory path to store the indexer (default: %(default)s)')
+
+    group2 = d_parser.add_argument_group('tokenizer optional arguments')
+    group2.add_argument('--case-folding', action='store_true',
+                        help='convert every token to lowercase')
+    group2.add_argument('--no-numbers', action='store_true',
+                        help='remove tokens with only numbers')
+    group2.add_argument('--stemmer', action='store_true',
+                        help='stemmerize the tokens')
+    group2.add_argument('--min-length', metavar='LENGTH', type=int, default=3,
+                        help='remove tokens with lower minimum length (default: %(default)s)')
+    group2.add_argument('--stopwords-file', metavar='FILE', default="../data/nltk_en_stopwords.txt",
+                        help='remove tokens from a stopwords file (default: %(default)s)')
+    group2.add_argument('--contractions-file', metavar='FILE', default="../data/en_contractions.txt",
+                        help='replace tokens from a contractions file (default: %(default)s)')
+
+    i_parser = subparser.add_parser('indexer')
+    i_parser.add_argument('indexer', metavar='DIR',
                        help='initialize indexer from a source directory of a indexer')
+    i_parser.add_argument('-s', '--search', metavar='FILE',
+                        help='text file with multiple queries separated by a new line')
 
-    # if len(sys.argv) == 2 and sys.argv[1] in ('-h', '--help'):
-    #     parser.print_help()
-    #     exit(0)
+    group3 = i_parser.add_argument_group('ranking optional arguments')
+    group3.add_argument('--name', metavar='NAME', type=str, default="VSM",
+                        help='the type of ranking (default: %(default)s)')
+    group3.add_argument('-p1', metavar='SCHEME', type=str, default="lnc",
+                        help='document scheme (default: %(default)s)')
+    group3.add_argument('-p2', metavar='SCHEME', type=str, default="ltc",
+                        help='query scheme (default: %(default)s)')
+    group3.add_argument('-k1', metavar='N', type=float, default=1.2,
+                        help='term frequency scaling (default: %(default)s)')
+    group3.add_argument('-b', metavar='N', type=float, default=1,
+                        help='document length normalization (default: %(default)s)')
 
-    args, unknown = parser.parse_known_args()
+    args = parser.parse_args()
 
-    print(args.help)
-
-    if args.help:
-        parser.print_help()
-        exit(0)
-
-    if args.dataset or args.help == 'dataset':
-        parser.add_argument('-c', '--config', metavar='FILE',
-                            help='json file with the configurations to build the tokenizer and indexer'
-                            '(additional options will be ignored)')
-
-        group1 = parser.add_argument_group('indexer optional arguments')
-        group1.add_argument('--positional', action='store_true',
-                            help='save the terms\' positions in a document')
-        group1.add_argument('--save-zip', action='store_true',
-                            help='zip the output files of the indexer')
-        group1.add_argument('--doc-rename', action='store_true',
-                            help='rename document IDs for a more efficient space usage')
-        # FIXME: nargs='?'
-        group1.add_argument('--file-location-step', metavar='STEP', type=int, nargs='?', default=1, const=0,
-                            help='store file location for terms step by step (const: %(const)s, default: %(default)s)')
-        group1.add_argument('--block-threshold', metavar='THRESHOLD', type=int, default=1_000_000,
-                            help='maximum number of documents that can be stored in a block (default: %(default)s)')
-        group1.add_argument('--merge-threshold', metavar='THRESHOLD', type=int, default=1_000_000,
-                            help='maximum number of documents that can be stored in a index (default: %(default)s)')
-        group1.add_argument('--merge-chunk-size', metavar='SIZE', type=int, default=1000,
-                            help='size of the block chunks read (default: %(default)s)')
-        group1.add_argument('--merge-dir', metavar='DIR', default="indexer/",
-                            help='source directory path to store the indexer (default: %(default)s)')
-
-        group2 = parser.add_argument_group('tokenizer optional arguments')
-        group2.add_argument('--case-folding', action='store_true',
-                            help='convert every token to lowercase')
-        group2.add_argument('--no-numbers', action='store_true',
-                            help='remove tokens with only numbers')
-        group2.add_argument('--stemmer', action='store_true',
-                            help='stemmerize the tokens')
-        group2.add_argument('--min-length', metavar='LENGTH', type=int, default=3,
-                            help='remove tokens with lower minimum length (default: %(default)s)')
-        group2.add_argument('--stopwords-file', metavar='FILE', default="../data/nltk_en_stopwords.txt",
-                            help='remove tokens from a stopwords file (default: %(default)s)')
-        group2.add_argument('--contractions-file', metavar='FILE', default="../data/en_contractions.txt",
-                            help='replace tokens from a contractions file (default: %(default)s)')
-
-        if args.help == 'dataset':
-            parser.print_help()
-            exit(0)
-
-        args = parser.parse_args()
+    if 'dataset' in args:
         create_indexer(args)
-
-    elif args.indexer or args.help == 'indexer':
-
-        parser.add_argument('-s', '--search', metavar='FILE',
-                            help='text file with multiple queries separated by a new line')
-
-        group3 = parser.add_argument_group('ranking optional arguments')
-        group3.add_argument('--name', metavar='NAME', type=str, default="VSM",
-                            help='the type of ranking (default: %(default)s)')
-        group3.add_argument('-p1', metavar='SCHEME', type=str, default="lnc",
-                            help='document scheme (default: %(default)s)')
-        group3.add_argument('-p2', metavar='SCHEME', type=str, default="ltc",
-                            help='query scheme (default: %(default)s)')
-        group3.add_argument('-k1', metavar='N', type=float, default=1.2,
-                            help='term frequency scaling (default: %(default)s)')
-        group3.add_argument('-b', metavar='N', type=float, default=1,
-                            help='document length normalization (default: %(default)s)')
-
-        if args.help == 'indexer':
-            parser.print_help()
-            exit(0)
-
-        args = parser.parse_args()
+    elif 'indexer' in args:
         init_indexer(args)
 
 
