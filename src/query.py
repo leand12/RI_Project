@@ -4,6 +4,7 @@ import math
 import logging
 import os
 
+
 class Ranking:
 
     def __init__(self, name, p1, p2):
@@ -15,23 +16,25 @@ class Ranking:
 class VSM(Ranking):
 
     def __init__(self, p1="lnc", p2="ltc", **ignore):
-            
-        if len(p1) != 3 or p1[0] not in ('l', 'n') or p1[0] not in ('n') or  p1[0] not in ('c', 'n'):
+
+        if len(p1) != 3 or p1[0] not in "ln" or p1[1] not in "n" or p1[2] not in "cn":
             logging.info(f"Configuration {p1} for the document is not implemented."
-                "Using default configuration: lnc")
+                         "Using default configuration: lnc")
             p1 = "lnc"
 
-        if len(p2) != 3 or p2[0] not in ('l', 'n') or p2[0] not in ('n', 't') or  p2[0] not in ('c', 'n'):
+        if len(p2) != 3 or p2[0] not in "ln" or p2[1] not in "tn" or p2[2] not in "cn":
             logging.info(f"Configuration {p2} for the query is not implemented."
-                "Using default configuration: ltc")
+                         "Using default configuration: ltc")
             p1 = "ltc"
-            
+
         super().__init__("VSM", p1, p2)
 
 
 class BM25(Ranking):
 
     def __init__(self, k1=1.2, b=1, **ignore):
+        assert 0 <= b <= 1, "The document length normalization, b, must be in [0, 1]"
+
         self.k1 = k1
         self.b = b
         super().__init__("BM25", k1, b)
@@ -45,12 +48,13 @@ class Query:
     def search_file(self, filename):
         if not os.path.exists("./queries"):
             os.mkdir("./queries")
+            
         with open(filename, "r") as f:
             for i, line in enumerate(f):
                 results = self.search(line)
-                with open("./queries/query" + str(i+1) + ".txt", "w+") as q:
-                    for r in results:
-                        q.write(f"{r[0]}\t{r[1]:.6f}\n")
+                with open(f"./queries/query{i+1}.txt", "w+") as q:
+                    for doc, score in results:
+                        q.write(f"{doc}\t{score:.6f}\n")
 
     def search(self, query):
 
@@ -90,7 +94,7 @@ class Query:
                     scores.setdefault(doc, 0)
                     scores[doc] += float(weights[i]) * lt * terms.count(term)
 
-        if scores: 
+        if scores:
             if self.indexer.ranking.p2[2] == 'c':
                 # **c
                 cos_norm = 1 / math.sqrt(cos_norm)
