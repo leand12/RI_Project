@@ -118,13 +118,7 @@ if __name__ == "__main__":
     group2.add_argument('--contractions-file', metavar='FILE', default="../data/en_contractions.txt",
                         help='replace tokens from a contractions file (default: %(default)s)')
 
-    i_parser = subparser.add_parser('indexer')
-    i_parser.add_argument('indexer', metavar='DIR',
-                       help='initialize indexer from a source directory of a indexer')
-    i_parser.add_argument('-s', '--search', metavar='FILE',
-                        help='text file with multiple queries separated by a new line')
-
-    group3 = i_parser.add_argument_group('ranking optional arguments')
+    group3 = d_parser.add_argument_group('ranking optional arguments')
     group3.add_argument('--name', metavar='NAME', type=str, default="VSM",
                         help='the type of ranking (default: %(default)s)')
     group3.add_argument('-p1', metavar='SCHEME', type=str, default="lnc",
@@ -136,6 +130,12 @@ if __name__ == "__main__":
     group3.add_argument('-b', metavar='N', type=float, default=1,
                         help='document length normalization (default: %(default)s)')
 
+    i_parser = subparser.add_parser('indexer')
+    i_parser.add_argument('indexer', metavar='DIR',
+                       help='initialize indexer from a source directory of a indexer')
+    i_parser.add_argument('-s', '--search', metavar='FILE',
+                        help='text file with multiple queries separated by a new line')
+
     args = parser.parse_args()
 
     if 'dataset' in args:
@@ -146,6 +146,8 @@ if __name__ == "__main__":
 
 """
 TODO:
+    class for postings?
+    what if there is no rank
     ver tempos das queries e tal
     readme
 """

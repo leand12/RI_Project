@@ -2,6 +2,7 @@
 # Leandro Silva 93446
 
 import logging
+import time
 import json
 import math
 import re
@@ -311,12 +312,10 @@ class Indexer:
                     term_r, *postings = line.strip().split(" ")
                     postings = [pos.split(',') for pos in postings]
 
-                term_r, idf = term_r.split(',')
-
                 if term == term_r:
                     weights = [pos[1] for pos in postings]
                     postings = [pos[0] for pos in postings]
-                    return idf, weights, postings
+                    return weights, postings
 
     def read_posting_lists(self, term):
         """Reads the posting list of a term from disk."""
@@ -336,15 +335,18 @@ class Indexer:
 
         # search position on file
         if term_file != None:
+            # FIXME: what if no ranking
+            idf = self.term_info[term].idf
             if self.file_location_step:
                 term_location = self.__get_term_location(term)
-                return self.__get_term_info_from_file(term, term_file, term_location - 1)
+                weights, postings = self.__get_term_info_from_file(term, term_file, term_location - 1)
             else:
-                return self.__get_term_info_from_file(term, term_file)
-        else:
-            logging.error(
-                f"An error occured when searching for the term: {term}")
-            exit(1)
+                weights, postings = self.__get_term_info_from_file(term, term_file)
+            return idf, weights, postings
+
+        logging.error(
+            f"An error occured when searching for the term: {term}")
+        exit(1)
 
     def clear_blocks(self):
         """Remove blocks folder."""
@@ -465,7 +467,7 @@ class Indexer:
         with self.open_merge_file(f"{self.merge_dir}{sorted_terms[0]} {last_term}.txt") as f:
             for ti, t in enumerate(sorted_terms):
                 if not threshold_term or t <= last_term:
-                    f.write(f"{t},{self.idf[t]} {' '.join(sorted(terms[t]))}\n")
+                    f.write(f"{t} {' '.join(sorted(terms[t]))}\n")
                     if self.file_location_step and ti % self.file_location_step == 0:
                         self.term_info[t].pos = ti + 1
                     del terms[t]
@@ -480,6 +482,9 @@ class Indexer:
         return doc_id
 
     def __calculate_ranking_info(self, terms, doc):
+        if not self.ranking:
+            return
+
         temp = [term for term, pos in terms]
 
         if self.ranking.name == "VSM": 
