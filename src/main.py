@@ -45,14 +45,14 @@ def init_indexer(args):
     logging.info(
         f"Time taken to start up index: {time.perf_counter() - start:.2f} seconds")
 
+    query = Query(indexer)
+
     if args.search:
         # TODO: count times for each query, and maybe store them
         query.search_file("queries.txt")
 
     else:
         while True:
-            query = Query(indexer)
-
             try:
                 search = input("Search: ")
             except EOFError:

@@ -61,6 +61,8 @@ class Query:
         terms = self.indexer.tokenizer.normalize_tokens(query.strip().split())
 
         if not terms:
+            # FIXME: this stops the search while true, which is bad, 
+            # maybe change to throw expection and handle it on main.py
             assert False, "The provided query is not valid"
 
         if self.indexer.ranking.name == "VSM":
@@ -107,7 +109,7 @@ class Query:
         scores = {}
         for term in set(terms):
             if (term_info := self.indexer.read_posting_lists(term)):
-                idf, weights, postings = term_info
+                _, weights, postings = term_info
 
                 for i, doc in enumerate(postings):
                     scores.setdefault(doc, 0)

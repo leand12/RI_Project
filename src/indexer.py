@@ -60,8 +60,6 @@ class Indexer:
 
         self.ranking = ranking         # ranking object
 
-        self.idf = {}
-
         # VS
         self.n_doc_indexed = 0
         self.term_doc_weights = {}
@@ -238,7 +236,7 @@ class Indexer:
 
         with open(f"{self.merge_dir}.metadata/term_info.txt", "r") as f:
             for line in f:
-                term, *rest = line.strip().split(',')
+                term, _ = line.strip().split(',', 1)
                 self.term_info[term] = TermInfo.create(line)
 
     def write_doc_ids(self):
@@ -334,8 +332,9 @@ class Indexer:
                 break
 
         # search position on file
-        if term_file != None:
+        if term_file != None and term in self.term_info:
             # FIXME: what if no ranking
+            
             idf = self.term_info[term].idf
             if self.file_location_step:
                 term_location = self.__get_term_location(term)
@@ -346,7 +345,8 @@ class Indexer:
 
         logging.error(
             f"An error occured when searching for the term: {term}")
-        exit(1)
+        # FIXME: return None or exception?
+        return None
 
     def clear_blocks(self):
         """Remove blocks folder."""
@@ -582,7 +582,7 @@ class Indexer:
         for term in self.term_info:
             document_frequency = self.term_info[term].posting_size
             idf = math.log10(self.n_doc_indexed / document_frequency)
-            self.idf[term] = idf
+            self.term_info[term].idf = idf
 
     def __calculate_ci(self):
 
@@ -591,7 +591,7 @@ class Indexer:
             len(self.document_lens)  # TODO: this is slow
 
         for term in self.term_frequency:
-            idf = self.idf[term]
+            idf = self.term_info[term].idf
 
             for doc in self.term_frequency[term]:
                 term_frequency = self.term_frequency[term][doc]
