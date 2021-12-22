@@ -307,7 +307,10 @@ class Indexer:
 
                 if term == term_r:
                     weights = [pos[1] for pos in postings]
-                    postings = [pos[0] for pos in postings]
+                    if self.rename_doc:
+                        postings = [self.doc_ids[pos[0]] for pos in postings]
+                    else:
+                        postings = [pos[0] for pos in postings]
                     return weights, postings
 
     def read_posting_lists(self, term):
@@ -528,7 +531,8 @@ class Indexer:
         # indexes a list of terms provided by the tokenizer
 
         if self.rename_doc:
-            self.doc_ids[doc] = self.__next_doc_id()
+            self.__next_doc_id()
+            self.doc_ids[self.__last_rename] = doc
             doc = self.__last_rename
 
         self.__calculate_ranking_info(terms, doc)

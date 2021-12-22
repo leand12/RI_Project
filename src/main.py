@@ -41,15 +41,15 @@ def search_indexer(args):
     start = time.perf_counter()
     indexer = Indexer.load_metadata(args.search)
 
-    # indexer.idf_score()
     logging.info(
         f"Time taken to start up index: {time.perf_counter() - start:.2f} seconds")
 
     query = Query(indexer)
 
     if args.query:
-        # TODO: count times for each query, and maybe store them
+        start = time.perf_counter()
         query.search_file(args.query)
+        logging.info(f"Total time taken to search for queries: {time.perf_counter() - start:.2f} seconds")
 
     else:
         while True:

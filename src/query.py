@@ -3,6 +3,7 @@
 import math
 import logging
 import os
+import time
 
 
 class Ranking:
@@ -48,7 +49,9 @@ class Query:
     def search_file(self, filename):
         with open(filename, "r") as f:
             for i, line in enumerate(f):
+                start = time.perf_counter()
                 results = self.search(line)
+                logging.info(f"Took {time.perf_counter() - start}s to search for {line}")
                 with open(f"./results.txt", "a+") as q:
                     q.write(f"Q: {line}\n")
                     for doc, score in results:
