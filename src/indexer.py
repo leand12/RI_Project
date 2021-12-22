@@ -55,22 +55,22 @@ class Indexer:
 
         self.save_zip = save_zip
 
-        self.ranking = ranking         # ranking object
+        self.ranking = ranking
 
-        # VS
+        # VSM
         self.n_doc_indexed = 0
-        self.term_doc_weights = {}
+        self.term_doc_weights = {}   # term_doc_weights keeps the information for either bm25 o 
 
         # BM25
         self.document_lens = {}     # saves the number of words for each document
         self.term_frequency = {}    # save
 
-        # RENAME DOC
+        # rename document ID
         self.__last_rename = ""
         self.doc_ids = {}
         self.rename_doc = rename_doc
 
-        # FILE LOCATION
+        # file location
         self.file_location_step = file_location_step
         self.__post_cnt = 0
 
@@ -265,15 +265,18 @@ class Indexer:
         return path.split("/")[-1].replace(".gz", "").split(".txt")[0]
 
     def __get_term_location(self, term):
-
+        """
+        Get the location of a term on a file.
+        If the file location step is provided, a binary search is performed.
+        """
         if self.file_location_step == 1:
             return self.term_info[term].position
-        
+    
+        # binary search
         sorted_term_info = sorted(self.term_info.keys())
-
+        
         low = index = 0
         high = len(sorted_term_info) - 1
-
         while low <= high:
             index = (high + low) // 2
             if sorted_term_info[index] < term:
@@ -289,9 +292,10 @@ class Indexer:
                 # previous term has file location
                 return pos + i
 
-    def __get_term_info_from_file(self, term, file, skip=0):
+    def __get_term_postings_from_file(self, term, filename, skip=0):
+        """Get the term postings and weights from a index file."""
 
-        with self.open_merge_file(file.replace(".gz", ""), "r") as f:
+        with self.open_merge_file(filename.replace(".gz", ""), "r") as f:
             for _ in range(skip):
                 f.readline()
 
@@ -334,9 +338,9 @@ class Indexer:
             idf = self.term_info[term].idf
             if self.file_location_step:
                 term_location = self.__get_term_location(term)
-                weights, postings = self.__get_term_info_from_file(term, term_file, term_location - 1)
+                weights, postings = self.__get_term_postings_from_file(term, term_file, term_location - 1)
             else:
-                weights, postings = self.__get_term_info_from_file(term, term_file)
+                weights, postings = self.__get_term_postings_from_file(term, term_file)
             return idf, weights, postings
 
         logging.warning(f"Ignoring term \"{term}\"")
@@ -383,6 +387,7 @@ class Indexer:
 
     def open_merge_file(self, filename, mode="w"):
         """Open and return a index file."""
+        
         if self.save_zip and not filename.endswith(".gz"):
             filename += ".gz"
 
@@ -447,15 +452,16 @@ class Indexer:
                     break
 
             if total >= self.merge_threshold:
-                # writes the terms to the file when the terms do not go pass a threshold
+                # write when the total terms postings exceed a threshold
                 self.__store_term_merged_file(terms, sorted_terms, term, True)
             elif not blocks:
-                # this will write the terms left in the last block
+                # write the left terms in the last block
                 self.__store_term_merged_file(terms, sorted_terms, term)
 
         self.clear_blocks()
 
     def __store_term_merged_file(self, terms, sorted_terms, last_term, threshold_term=False):
+        """Write the terms in memory to an index file."""
 
         logging.info(f"Writing index \"{sorted_terms[0]} {last_term}\" to disk")     
         with self.open_merge_file(f"{self.merge_dir}{sorted_terms[0]} {last_term}.txt") as f:
@@ -467,11 +473,13 @@ class Indexer:
                     del terms[t]
 
     def __next_doc_id(self):
+        """Get the next alias for the document ID"""
         
+        # range of alias' alphabet in the ascii table
         max_char = 126
         min_char = 48
-        doc_id = list(self.__last_rename) or list(chr(min_char))
 
+        doc_id = list(self.__last_rename) or list(chr(min_char))
         i = -1
         while True:
             if ord(doc_id[i]) == max_char:
@@ -487,6 +495,8 @@ class Indexer:
         return self.__last_rename
 
     def __calculate_ranking_info(self, terms, doc):
+        """Calculate the ranking info"""
+        
         if not self.ranking:
             return
 
@@ -585,6 +595,7 @@ class Indexer:
         self.write_indexer_config()
 
     def __calculate_idf(self):
+        """Calculate inverse document frequency for each term."""
 
         for term in self.term_info:
             document_frequency = self.term_info[term].posting_size
@@ -592,10 +603,10 @@ class Indexer:
             self.term_info[term].idf = idf
 
     def __calculate_ci(self):
+        """Calculate BM25 weights for each term-doc."""
 
         self.term_doc_weights = {}     # {term : {doc: ci}}
-        avdl = sum(self.document_lens.values()) / \
-            len(self.document_lens)
+        avdl = sum(self.document_lens.values()) / len(self.document_lens)
 
         for term in self.term_frequency:
             idf = self.term_info[term].idf
@@ -606,5 +617,6 @@ class Indexer:
 
                 ci = idf * (self.ranking.k1 + 1) * term_frequency / (self.ranking.k1 *
                     ((1 - self.ranking.b) + self.ranking.b * document_len/avdl) + term_frequency)
+                
                 self.term_doc_weights.setdefault(term, {})
                 self.term_doc_weights[term][doc] = ci
