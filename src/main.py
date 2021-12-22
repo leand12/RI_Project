@@ -150,8 +150,6 @@ if __name__ == "__main__":
 """
 TODO:
     remove indexer if already exists
-    class for postings?
-    what if there is no rank
     ver tempos das queries e tal
     readme
 """

@@ -2,11 +2,8 @@
 # Leandro Silva 93446
 
 import logging
-import time
 import json
 import math
-import re
-import sys
 import os
 import glob
 import gzip
@@ -22,16 +19,16 @@ class TermInfo():
         self.position = position or None
         self.idf = idf or None
 
-    def __str__(self):
-        return f"{self.posting_size},{self.position or ''},{self.idf or '':.6f}"
+    def __str__(self): # podemos aqui nao escrever, acho q é so aqui, já esta a dar
+        return f"{self.idf or '':.6f},{self.position or ''}"
 
     def __repr__(self):
         return self.__str__()
 
     @staticmethod
     def create(line):
-        term, posting_size, position, idf = line.strip().split(',')
-        return TermInfo(int(posting_size), 
+        term, idf, position = line.strip().split(',')
+        return TermInfo(0,
             position and int(position), idf and float(idf))
     
 
@@ -39,7 +36,7 @@ class Indexer:
 
     def __init__(self, tokenizer=Tokenizer(), positional=False, save_zip=False, rename_doc=False, file_location_step=0,
                  block_threshold=1_000_000, merge_threshold=1_000_000, merge_chunk_size=1000,
-                 ranking=None, merge_dir="indexer/", **ignore):
+                 ranking=VSM(), merge_dir="indexer/", **ignore):
 
         self.positional = positional
         self.index = {}             # {term: {doc: [pos]}} || {term: [docs]}
@@ -69,7 +66,7 @@ class Indexer:
         self.term_frequency = {}    # save
 
         # RENAME DOC
-        self.__last_rename = 0
+        self.__last_rename = ""
         self.doc_ids = {}
         self.rename_doc = rename_doc
 
@@ -223,8 +220,7 @@ class Indexer:
         logging.info("Writing # of postings for each term to disk")
         with open(self.merge_dir + ".metadata/term_info.txt", "w+") as f:
 
-            # term posting_size file_location_step
-            # FIXME: se tivessemos o term info como objeto era mais facil de escrever em ficheiros XD
+            # term idf file_location_step
             for term in sorted(self.term_info):
                 f.write(f"{term},{self.term_info[term]}\n")
 
@@ -427,6 +423,7 @@ class Indexer:
                         line = doc.strip().split(' ')
                         term, doc_lst = line[0], line[1:]
                         if self.ranking:
+                            # FIXME: there is a problem when there is no positional here
                             for i, doc_str in enumerate(doc_lst):
                                 doc = doc_str.split(',', 1)[0]
                                 # doc_lst[i] += ',' + self.term_doc_weights[term][doc]
@@ -465,13 +462,13 @@ class Indexer:
                 if not threshold_term or t <= last_term:
                     f.write(f"{t} {' '.join(sorted(terms[t]))}\n")
                     if self.file_location_step and ti % self.file_location_step == 0:
-                        self.term_info[t].pos = ti + 1
+                        self.term_info[t].position = ti + 1
                     del terms[t]
 
     def __next_doc_id(self):
         
         max_char = 126
-        min_char = 33
+        min_char = 48
         doc_id = list(self.__last_rename) or list(chr(min_char))
         # [33 126]
         i = -1
@@ -484,14 +481,9 @@ class Indexer:
                 doc_id[i] = chr(ord(doc_id[i]) + 1)
                 break
             i -= 1
-        return "".join(doc_id)
 
-    def __get_new_doc_id(self, doc):
-
-        # FIXME: __doc_id_cnt is the same as n_doc_indexed
-        doc_id = self.__next_doc_id()
-        self.doc_ids[doc_id] = doc
-        return doc_id
+        self.__last_rename = "".join(doc_id)
+        return self.__last_rename
 
     def __calculate_ranking_info(self, terms, doc):
         if not self.ranking:
@@ -536,7 +528,8 @@ class Indexer:
         # indexes a list of terms provided by the tokenizer
 
         if self.rename_doc:
-            doc = self.__get_new_doc_id(doc)
+            self.doc_ids[doc] = self.__next_doc_id()
+            doc = self.__last_rename
 
         self.__calculate_ranking_info(terms, doc)
 
