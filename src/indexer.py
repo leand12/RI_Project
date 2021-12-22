@@ -69,7 +69,7 @@ class Indexer:
         self.term_frequency = {}    # save
 
         # RENAME DOC
-        self.__doc_id_cnt = 0
+        self.__last_rename = 0
         self.doc_ids = {}
         self.rename_doc = rename_doc
 
@@ -264,8 +264,7 @@ class Indexer:
             for line in f:
                 doc_id, doc = line.strip().split(" ")
                 self.doc_ids[doc_id] = doc
-        self.__doc_id_cnt = len(self.doc_ids)
-
+        # FIXME: maybe set the __last_rename when reading from disk
     def __get_filename(self, path):
         return path.split("/")[-1].replace(".gz", "").split(".txt")[0]
 
@@ -472,13 +471,29 @@ class Indexer:
                         self.term_info[t].pos = ti + 1
                     del terms[t]
 
+    def __next_doc_id(self):
+        
+        max_char = 126
+        min_char = 33
+        doc_id = list(self.__last_rename) or list(chr(min_char))
+        # [33 126]
+        i = -1
+        while True:
+            if ord(doc_id[i]) == max_char:
+                doc_id[i] = chr(min_char)
+                if i == -len(doc_id):
+                    doc_id[:0] = [chr(min_char - 1)] 
+            else:
+                doc_id[i] = chr(ord(doc_id[i]) + 1)
+                break
+            i -= 1
+        return "".join(doc_id)
+
     def __get_new_doc_id(self, doc):
 
-        # FIXME: change this to use letters and numbers
         # FIXME: __doc_id_cnt is the same as n_doc_indexed
-        doc_id = str(self.__doc_id_cnt)
+        doc_id = self.__next_doc_id()
         self.doc_ids[doc_id] = doc
-        self.__doc_id_cnt += 1
         return doc_id
 
     def __calculate_ranking_info(self, terms, doc):
