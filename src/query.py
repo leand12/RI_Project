@@ -47,13 +47,20 @@ class Query:
         self.indexer = indexer
 
     def search_file(self, filename):
+        
         with open(filename, "r") as f:
-            for i, line in enumerate(f):
-                start = time.perf_counter()
-                results = self.search(line)
-                logging.info(f"Took {time.perf_counter() - start}s to search for {line}")
-                with open(f"./results.txt", "a+") as q:
+            with open(f"./results.txt", "w") as q:
+                for i, line in enumerate(f):
+                    start = time.perf_counter()
+                    results = self.search(line)
+
+                    logging.info(f"Took {time.perf_counter() - start}s to search for {line}")
+                    
                     q.write(f"Q: {line}\n")
+                    if not results:
+                        q.write("Your search - {line} - did not match any documents\n")
+                        continue
+                    
                     for doc, score in results:
                         q.write(f"{doc}\t{score:.6f}\n")
                     q.write("\n")
@@ -63,15 +70,12 @@ class Query:
         terms = self.indexer.tokenizer.normalize_tokens(query.strip().split())
 
         if not terms:
-            # FIXME: this stops the search while true, which is bad, 
-            # maybe change to throw expection and handle it on main.py
-            assert False, "The provided query is not valid"
+            return None
 
         if self.indexer.ranking.name == "VSM":
             return self.tf_idf_score(terms)[:10]
         elif self.indexer.ranking.name == "BM25":
             return self.bm25_score(terms)[:10]
-        # FIXME: return something when there is no ranking
 
     def tf_idf_score(self, terms):
 

@@ -145,11 +145,3 @@ if __name__ == "__main__":
         create_indexer(args)
     elif args.mode == 'search':
         search_indexer(args)
-
-
-"""
-TODO:
-    remove indexer if already exists
-    ver tempos das queries e tal
-    readme
-"""

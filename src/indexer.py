@@ -260,7 +260,7 @@ class Indexer:
             for line in f:
                 doc_id, doc = line.strip().split(" ")
                 self.doc_ids[doc_id] = doc
-        # FIXME: maybe set the __last_rename when reading from disk
+
     def __get_filename(self, path):
         return path.split("/")[-1].replace(".gz", "").split(".txt")[0]
 
@@ -317,8 +317,8 @@ class Indexer:
         """Reads the posting list of a term from disk."""
 
         if not os.path.exists(self.merge_dir):
-            logging.error(
-                "Index Directory does not exist. Cannot read posting lists.")
+            logging.error("Index Directory does not exist. Cannot read posting lists.")
+            exit(1)
 
         # search for file
         files = glob.glob(f"{self.merge_dir}/*.txt*")
@@ -339,8 +339,7 @@ class Indexer:
                 weights, postings = self.__get_term_info_from_file(term, term_file)
             return idf, weights, postings
 
-        logging.error(
-            f"An error occured when searching for the term: {term}")
+        logging.warning(f"Ignoring term \"{term}\"")
         return None
 
     def clear_blocks(self):
@@ -365,7 +364,6 @@ class Indexer:
 
     def open_file_to_index(self, filename):
         """Open and return the dataset file."""
-        # FIXME: what
         try:
             f = open(filename, "r")
             f.readline()  # skip header
@@ -426,12 +424,10 @@ class Indexer:
                         line = doc.strip().split(' ')
                         term, doc_lst = line[0], line[1:]
                         if self.ranking:
-                            # FIXME: there is a problem when there is no positional here
                             for i, doc_str in enumerate(doc_lst):
                                 doc = doc_str.split(',', 1)[0]
                                 # doc_lst[i] += ',' + self.term_doc_weights[term][doc]
                                 n = len(doc)
-                                # if term == '000o':
                                 doc_lst[i] = f"{doc_str[:n]},{self.term_doc_weights[term][doc]:.6f}{doc_str[n:]}"
                         terms.setdefault(term, set()).update(doc_lst)
                     last_terms[b] = term
@@ -473,7 +469,7 @@ class Indexer:
         max_char = 126
         min_char = 48
         doc_id = list(self.__last_rename) or list(chr(min_char))
-        # [33 126]
+
         i = -1
         while True:
             if ord(doc_id[i]) == max_char:
@@ -597,7 +593,7 @@ class Indexer:
 
         self.term_doc_weights = {}     # {term : {doc: ci}}
         avdl = sum(self.document_lens.values()) / \
-            len(self.document_lens)  # TODO: this is slow
+            len(self.document_lens)
 
         for term in self.term_frequency:
             idf = self.term_info[term].idf
