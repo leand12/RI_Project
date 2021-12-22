@@ -29,7 +29,7 @@ def create_indexer(args):
         indexer = Indexer(tokenizer=tokenizer, **args_dict)
 
     start = time.perf_counter()
-    indexer.index_file(args.dataset)
+    indexer.index_file(args.index)
     logging.info(
         f"Finished indexing ({time.perf_counter() - start:.2f} seconds)")
     logging.info(f"Vocabulary size: {indexer.vocabulary_size}")
@@ -37,9 +37,9 @@ def create_indexer(args):
     logging.info(f"Index segments written to disk: {indexer.num_segments}")
 
 
-def init_indexer(args):
+def search_indexer(args):
     start = time.perf_counter()
-    indexer = Indexer.load_metadata(args.indexer)
+    indexer = Indexer.load_metadata(args.search)
 
     # indexer.idf_score()
     logging.info(
@@ -77,14 +77,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Document indexer using the SPIMI approach')
 
-    subparser = parser.add_subparsers()
+    subparser = parser.add_subparsers(title='mode', dest='mode', required=True, help='mode of the program')
 
-    d_parser = subparser.add_parser('dataset')
-    d_parser.add_argument('dataset', metavar='FILE',
-                       help='create indexer from a file with the documents to index')
+    d_parser = subparser.add_parser('index', help='create an indexer with the configurations provided')
+    d_parser.add_argument('index', metavar='FILE',
+                          help='file with the documents to index')
     d_parser.add_argument('-c', '--config', metavar='FILE',
-                        help='json file with the configurations to build the tokenizer and indexer'
-                        '(additional options will be ignored)')
+                          help='json file with the configurations to build the tokenizer and indexer'
+                          '(additional options will be ignored)')
 
     group1 = d_parser.add_argument_group('indexer optional arguments')
     group1.add_argument('--positional', action='store_true',
@@ -130,18 +130,18 @@ if __name__ == "__main__":
     group3.add_argument('-b', metavar='N', type=float, default=1,
                         help='document length normalization (default: %(default)s)')
 
-    i_parser = subparser.add_parser('indexer')
-    i_parser.add_argument('indexer', metavar='DIR',
-                       help='initialize indexer from a source directory of a indexer')
-    i_parser.add_argument('-s', '--search', metavar='FILE',
-                        help='text file with multiple queries separated by a new line')
+    i_parser = subparser.add_parser('search', help='search in an indexer already created')
+    i_parser.add_argument('search', metavar='DIR',
+                          help='source directory of an indexer')
+    i_parser.add_argument('-q', '--query', metavar='FILE',
+                          help='text file with multiple queries separated by a new line')
 
     args = parser.parse_args()
 
-    if 'dataset' in args:
+    if args.mode == 'index':
         create_indexer(args)
-    elif 'indexer' in args:
-        init_indexer(args)
+    elif args.mode == 'search':
+        search_indexer(args)
 
 
 """
