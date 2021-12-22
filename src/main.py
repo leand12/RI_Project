@@ -77,13 +77,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Document indexer using the SPIMI approach')
 
-    subparser = parser.add_subparsers(title='mode', dest='mode', required=True, help='mode of the program')
+    subparser = parser.add_subparsers(
+        title='mode argument', dest='mode', required=True, help='mode of the program')
 
-    d_parser = subparser.add_parser('index', help='create an indexer with the configurations provided')
+    d_parser = subparser.add_parser('index',
+                                    help='create an indexer with the configurations provided')
     d_parser.add_argument('index', metavar='FILE',
                           help='file with the documents to index')
     d_parser.add_argument('-c', '--config', metavar='FILE',
-                          help='json file with the configurations to build the tokenizer and indexer'
+                          help='json file with configurations to build the indexer '
                           '(additional options will be ignored)')
 
     group1 = d_parser.add_argument_group('indexer optional arguments')
@@ -119,7 +121,7 @@ if __name__ == "__main__":
                         help='replace tokens from a contractions file (default: %(default)s)')
 
     group3 = d_parser.add_argument_group('ranking optional arguments')
-    group3.add_argument('--name', metavar='NAME', type=str, default="VSM",
+    group3.add_argument('--name', choices=['VSM', 'BM25'], default="BM25",
                         help='the type of ranking (default: %(default)s)')
     group3.add_argument('-p1', metavar='SCHEME', type=str, default="lnc",
                         help='document scheme (default: %(default)s)')
@@ -130,7 +132,8 @@ if __name__ == "__main__":
     group3.add_argument('-b', metavar='N', type=float, default=1,
                         help='document length normalization (default: %(default)s)')
 
-    i_parser = subparser.add_parser('search', help='search in an indexer already created')
+    i_parser = subparser.add_parser('search',
+                                    help='search in an indexer already created')
     i_parser.add_argument('search', metavar='DIR',
                           help='source directory of an indexer')
     i_parser.add_argument('-q', '--query', metavar='FILE',
