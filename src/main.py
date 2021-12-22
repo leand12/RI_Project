@@ -47,9 +47,9 @@ def search_indexer(args):
 
     query = Query(indexer)
 
-    if args.search:
+    if args.query:
         # TODO: count times for each query, and maybe store them
-        query.search_file("queries.txt")
+        query.search_file(args.query)
 
     else:
         while True:
@@ -149,6 +149,7 @@ if __name__ == "__main__":
 
 """
 TODO:
+    remove indexer if already exists
     class for postings?
     what if there is no rank
     ver tempos das queries e tal

@@ -23,7 +23,7 @@ class TermInfo():
         self.idf = idf or None
 
     def __str__(self):
-        return f"{self.posting_size},{self.position or ''},{self.idf or ''}"
+        return f"{self.posting_size},{self.position or ''},{self.idf or '':.6f}"
 
     def __repr__(self):
         return self.__str__()
@@ -333,8 +333,6 @@ class Indexer:
 
         # search position on file
         if term_file != None and term in self.term_info:
-            # FIXME: what if no ranking
-            
             idf = self.term_info[term].idf
             if self.file_location_step:
                 term_location = self.__get_term_location(term)
@@ -345,7 +343,6 @@ class Indexer:
 
         logging.error(
             f"An error occured when searching for the term: {term}")
-        # FIXME: return None or exception?
         return None
 
     def clear_blocks(self):
@@ -436,7 +433,7 @@ class Indexer:
                                 # doc_lst[i] += ',' + self.term_doc_weights[term][doc]
                                 n = len(doc)
                                 # if term == '000o':
-                                doc_lst[i] = f"{doc_str[:n]},{self.term_doc_weights[term][doc]}{doc_str[n:]}"
+                                doc_lst[i] = f"{doc_str[:n]},{self.term_doc_weights[term][doc]:.6f}{doc_str[n:]}"
                         terms.setdefault(term, set()).update(doc_lst)
                     last_terms[b] = term
                 b += 1

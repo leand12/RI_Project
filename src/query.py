@@ -46,15 +46,14 @@ class Query:
         self.indexer = indexer
 
     def search_file(self, filename):
-        if not os.path.exists("./queries"):
-            os.mkdir("./queries")
-            
         with open(filename, "r") as f:
             for i, line in enumerate(f):
                 results = self.search(line)
-                with open(f"./queries/query{i+1}.txt", "w+") as q:
+                with open(f"./results.txt", "a+") as q:
+                    q.write(f"Q: {line}\n")
                     for doc, score in results:
                         q.write(f"{doc}\t{score:.6f}\n")
+                    q.write("\n")
 
     def search(self, query):
 
@@ -66,9 +65,9 @@ class Query:
             assert False, "The provided query is not valid"
 
         if self.indexer.ranking.name == "VSM":
-            return self.tf_idf_score(terms)
+            return self.tf_idf_score(terms)[:10]
         elif self.indexer.ranking.name == "BM25":
-            return self.bm25_score(terms)
+            return self.bm25_score(terms)[:10]
         # FIXME: return something when there is no ranking
 
     def tf_idf_score(self, terms):
@@ -102,7 +101,7 @@ class Query:
                 cos_norm = 1 / math.sqrt(cos_norm)
                 for doc in scores:
                     scores[doc] *= cos_norm
-            return sorted(scores.items(), key=lambda x: -x[1])[:10]
+            return sorted(scores.items(), key=lambda x: -x[1])
 
     def bm25_score(self, terms):
 
@@ -116,4 +115,4 @@ class Query:
                     scores[doc] += float(weights[i]) * terms.count(term)
 
         if scores:
-            return sorted(scores.items(), key=lambda x: -x[1])[:10]
+            return sorted(scores.items(), key=lambda x: -x[1])

@@ -7,6 +7,7 @@ import re
 
 class Review:
     ID = 2
+    TITLE = 5
     HEADLINE = -3
     BODY = -2
 
@@ -67,7 +68,7 @@ class Tokenizer:
             return None, None
 
         doc = line.split('\t')
-        review = doc[Review.HEADLINE] + " " + doc[Review.BODY]
+        review = doc[Review.TITLE] + " " + doc[Review.HEADLINE] + " " + doc[Review.BODY]
         review_id = doc[Review.ID]
 
         # self.update_fields(doc)
