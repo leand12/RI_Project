@@ -62,7 +62,7 @@ Finally, the indexer needs to save its configuration for it to load whenever it 
  
 ### Ranking
 
-There are 2 available ranking algorithms: VSM and BM25. The indexer uses the selected algorithm to rank the documents for a given query. The algorithms are choosed while indexing the dataset and in order to be swapped(or to change any of its parameters), it requires the indexer to index the dataset again.
+There are 2 available ranking algorithms: VSM (Vector Space Model) and BM25 (Best Matching). The indexer uses the selected algorithm to rank the documents for a given query. The algorithms are choosed while indexing the dataset and in order to be swapped(or to change any of its parameters), it requires the indexer to index the dataset again.
 
 #### VSM
 
@@ -258,21 +258,16 @@ uses a contraction file that has many english contractions. If a token matches o
 ### Ranking
 
 `--name {VSM,BM25}`\
-the type of the ranking that the indexer has to follow when running a query
+the type of the ranking that the indexer has to follow when running a query.
 
 `p1 SCHEME`\
-the document scheme
+the weighting scheme in SMART notation for the document. Used by VSM.
 
 `p2 SCHEME`\
-the query scheme
+the weighting scheme in SMART notation for the query. Used by VSM.
 
 `k1 N`\
-
+controls the term frequency scaling. k1 = 0 is a binary model, while a large k1 is a raw term frequency. Typically, k1 is set around 1.2–2. Used by BM25.
 
 `b N`\
-
-the type of ranking (default: BM25)
-  -p1 SCHEME            document scheme (default: lnc)
-  -p2 SCHEME            query scheme (default: ltc)
-  -k1 N                 term frequency scaling (default: 1.2)
-  -b N                  document length normalization (default: 1)
+controls the document length normalization. b = 0 is no length normalization, while b = 1 is relative frequency. Typically, b around 0.75. Used by BM25.
