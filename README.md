@@ -9,12 +9,12 @@
 
 ## Table of Contents <!-- omit in toc -->
 - [How it works](#how-it-works)
-  - [Tokenizer](#tokenizer)
-  - [Indexer](#indexer)
+- [Tokenizer](#tokenizer)
+- [Indexer](#indexer)
 - [Results](#results)
 - [How to run](#how-to-run)
-  - [Indexer](#indexer-1)
-  - [Tokenizer](#tokenizer-1)
+- [Indexer](#indexer-1)
+- [Tokenizer](#tokenizer-1)
 
 
 
@@ -60,8 +60,47 @@ If the flag "doc_rename" is set, then the file "doc_ids.txt" is also saved. This
 Finally, the indexer needs to save its configuration for it to load whenever it neads to perform a query. This file is saved as "config.json". 
 
  
+### Ranking
+
+There are 2 available ranking algorithms: VSM and BM25. The indexer uses the selected algorithm to rank the documents for a given query. The algorithms are choosed while indexing the dataset and in order to be swapped(or to change any of its parameters), it requires the indexer to index the dataset again.
+
+#### VSM
+
+VSM has 2 parameters, `p1` and `p2`, that correspond to the schema that will be used when calculating the weights for the rankibg algorithm. P1 defines the schema for the weigths of terms in the documents, while P2 defines the weights of the terms in the query. The indexer supports different values for P1 and P2.
+
+P1
+```
+l n c
+l n n
+n n c
+```
+the first letter can be `l/n` and the last letter can be `c/n`. The middle letter can only be `n`.
+
+
+P2
+```
+l t c
+l t n
+l n c
+l n n
+n t c
+n t n
+n n c
+```
+
+the first letter can be `l/n`, the middle letter can be `t/n` and the last letter can be `c/n`.
+
+The default values for p1 and p2 are `lnc` and `ltc` respectively.
+
+
+#### BM25
+
+BM25 also has 2 parameters called `k1` and `b`, with default values `1.2` and `0.75`.
+
  ## Results
 
+
+### Indexing
 There were conducted some experiments with different configurations in order to see their tradeoffs and benefits. This table shows for each experiment the configurations that were used.
 
 
@@ -104,34 +143,69 @@ Finally, when compressing the index files, we can see that the space taken on di
 
 For all the datasets it was use the first config file in the first table. The thresholds for the blocks to be written to disk were changed based on the size of the file. So, the size of a block on the first dataset is much smaller than the size of a block in the last dataset. 
 
+
+### Ranking
+
+Both the ranking algorithms create an overhead in the indexer, increasing the time and space required. 
+
+Tests were performed using the smaller dataset and the results are as follows:
+
+#### VSM
+
+games:
+lnc.ltc = 106sec 30MB 0.24 2.47 
+
+music:
+
+ltc.lnc = 504sec 909MB 0.87 24.05
+        = 812sec 263MB 2.07 14.88
+
+games:
+
+74.32 seconds 28.76 MB  0.23  1.74
+
+music:
+
+628.59 seconds 235.74 MB  1.68 seconds 11.95 second
+
+
 ## How to run
 
-The indexer and tokinizer provide the user a range of different options to customize the way they work. Files can be runned providing the desired parameters via terminal or by using a configuration file. 
-Note: if the provided dataset file is a `.gz` file it will unzip it as it reads.
+This program has 2 modes to run, one to create an indexer from a dataset, and another to search in a pre-created indexer.
+
+In the `index` mode, the user can use a wide range of different options in the terminal to customize the indexer, tokenizer and ranking. Alternatively, the user can pass a configuration file with all the customizable options.
+
+In the `search` mode, the user can search some queries in a pre-created indexer.
+
+For additional information, run the program with the help argument for the respective mode.
+
+**Note:** if the provided dataset file is a `.gz` file it will unzip it as it reads.
+
 
 Examples:
 
-- To create an indexer, and optionally with some arguments, use:
 
+- To create an indexer, and optionally with some arguments, use:
 ```
-python3 main.py -d ../dataset [OPTIONS ...]
+python3 main.py index ../dataset [OPTIONS ...]
 ```
-where ../dataset is the path of the dataset.
+where `../dataset` is the path of the dataset.
+
 
 - To create an indexer with a config file use:
-
 ```
-python3 main.py -d ../dataset -c config.json 
+python3 main.py index ../dataset -c config.json 
 ```
-where config.json is the path of the config file.
+where `config.json` is the path of the config file.
 
 
 - To run a pre-created indexer, use:
+```
+python3 main.py search indexer/
+```
+where `indexer/` is the path to the created indexer folder.
 
-```
-python3 main.py -i indexer/
-```
-where indexer/ is the path to the created indexer folder.
+
 ### Indexer
 
 The indexer has a few options:
@@ -145,22 +219,14 @@ when provided, the output files of the indexer will be zipped. This saves disk s
 `--rename-doc`\
 when provided, the documents will be renamed as an integer which occupies less bytes to store. For smaller number of documents, this will decrease the space required to store the indexer, but in exchange, will consume a bit more space in RAM. For larger number of documents, it will not work, as it will end up needing more space to store a single document.
 
-
-`--file-location`\
-with this flag activated, the location of a term in a file will be stored in memory and later send to disk. This will increase the speed at which the indexer accesses a certain term, but will need more disk storage and RAM. 
-
-
-`--file-location-step STEP`\
-the step corresponds to the number of terms that are skipped in order to save the next file position. A bigger step will result in a slower search but decreases the disk space required to save the positions. A step of 1 keeps the position for every term in the corresponding file.
+`--file-location-step [STEP]`\
+when provided, the location of a term in a file will be stored in memory and later send to disk. This will increase the speed at which the indexer accesses a certain term, but will need more disk storage and RAM. The step corresponds to the number of terms that are skipped in order to save the next file position. A bigger step will result in a slower search but decreases the disk space required to save the positions. A step of 1 keeps the position for every term in the corresponding file.
 
 `--block-threshold THRESHOLD`\
 corresponds to the maximum number of documents that can be stored in a block. A smaller value will result in more files, slowing down the merge and takes more time writting to disk. While if a higher value is choosed, the indexer can run out of RAM.
 
 `--merge-threshold THRESHOLD`\
 corresponds to the maximum number of postings for a merged file in disk. The higher the value, lesser files will be created, but can slow down search as there are bigger files to look for the terms.
-
-`--block-dir DIR`\
-the temporary directory where the blocks will be stored. After the merge the blocks and this directory are deleted.
 
 `--merge-dir DIR`\
 the final directory where the indexer is stored. This directory should contain a ".metadata" directory containing the necessary metadata files required for the indexer to be loaded.
@@ -187,3 +253,26 @@ discards every word that is contained in the stopwords file.
 
 `--contractions-file FILE`\
 uses a contraction file that has many english contractions. If a token matches one of the contractions it is converted in the non contracted list of tokens.
+
+
+### Ranking
+
+`--name {VSM,BM25}`\
+the type of the ranking that the indexer has to follow when running a query
+
+`p1 SCHEME`\
+the document scheme
+
+`p2 SCHEME`\
+the query scheme
+
+`k1 N`\
+
+
+`b N`\
+
+the type of ranking (default: BM25)
+  -p1 SCHEME            document scheme (default: lnc)
+  -p2 SCHEME            query scheme (default: ltc)
+  -k1 N                 term frequency scaling (default: 1.2)
+  -b N                  document length normalization (default: 1)
