@@ -51,12 +51,14 @@ class Query:
         with open(filename, "r") as f:
             with open(f"./results.txt", "w") as q:
                 for i, line in enumerate(f):
+                    line = line.strip()
+
                     start = time.perf_counter()
                     results = self.search(line)
 
-                    logging.info(f"Took {time.perf_counter() - start}s to search for {line}")
+                    logging.info(f"{time.perf_counter() - start:.2f} sec to search for \"{line}\"")
                     
-                    q.write(f"Q: {line}\n")
+                    q.write(f"Q: {line}\n\n")
                     if not results:
                         q.write("Your search - {line} - did not match any documents\n")
                         continue
@@ -73,9 +75,9 @@ class Query:
             return None
 
         if self.indexer.ranking.name == "VSM":
-            return self.tf_idf_score(terms)[:10]
+            return self.tf_idf_score(terms)[:100]
         elif self.indexer.ranking.name == "BM25":
-            return self.bm25_score(terms)[:10]
+            return self.bm25_score(terms)[:100]
 
     def tf_idf_score(self, terms):
 

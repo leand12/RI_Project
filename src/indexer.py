@@ -156,7 +156,7 @@ class Indexer:
     def write_block_disk(self):
         """Writes the current block to disk."""
 
-        logging.info("Writing block to disk")
+        logging.info(f"Writing block {self.__block_cnt} to disk")
         block_dir = self.merge_dir + "block/"
         if not os.path.exists(self.merge_dir):
             os.mkdir(self.merge_dir)
@@ -392,7 +392,8 @@ class Indexer:
 
     def merge_block_disk(self):
         """Merge all blocks in disk."""
-        logging.info("Merge Block disk")
+
+        logging.info("Merging blocks from disk")
         if not os.path.exists(self.merge_dir):
             os.mkdir(self.merge_dir)
         if not os.path.exists(f"{self.merge_dir}.metadata/"):
@@ -456,6 +457,7 @@ class Indexer:
 
     def __store_term_merged_file(self, terms, sorted_terms, last_term, threshold_term=False):
 
+        logging.info(f"Writing index \"{sorted_terms[0]} {last_term}\" to disk")     
         with self.open_merge_file(f"{self.merge_dir}{sorted_terms[0]} {last_term}.txt") as f:
             for ti, t in enumerate(sorted_terms):
                 if not threshold_term or t <= last_term:
