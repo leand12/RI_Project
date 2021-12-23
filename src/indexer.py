@@ -19,41 +19,49 @@ class TermInfo():
         self.position = position or None
         self.idf = idf or None
 
-    def __str__(self):
-        # TODO: BM25 remove idf and fix this error
-        return f"{self.idf or '':.6f},{self.position or ''}"
-
-    def __repr__(self):
-        return self.__str__()
-
     @staticmethod
     def create(line):
         term, idf, position = line.strip().split(',')
-        return TermInfo(0,
-            position and int(position), idf and float(idf))
-    
+        return TermInfo(0, position and int(position), idf and float(idf))
+
+    def write(self):
+        # TODO: BM25 remove idf and fix this error
+        return f"{self.idf or '':.6f},{self.position or ''}"
+
 
 class PostingInfo():
-    # doc,w,tf,p1,p2    
     def __init__(self, doc_id, term_freq, positions, weight=None):
         self.doc_id = doc_id
-        self.positions = positions or []
+        self.positions = positions
         self.weight = weight
         self.term_freq = term_freq
-    
-    def __str__(self):
-        w = ''
+
+    @staticmethod
+    def create(line, positional=False):
+        if not positional:
+            pos = None
+            d, w, tf = line.strip().split(',', 2)
+        else:
+            d, w, tf, pos = line.strip().split(',', 3)
+        return PostingInfo(d, tf and int(tf), pos, w and float(w))
+
+    def write_to_block(self):
+        # doc,w,tf,pos
+        w = p = ''
         if self.weight:
             w = f"{self.weight:.6f}"
-        return f"{self.doc_id},{w},{self.term_freq or ''},{','.join(self.positions)}"
+        if self.positions:
+            p = ',' + self.positions
+        return f"{self.doc_id},{w},{self.term_freq or ''}{p}"
 
-    def __repr__(self):
-        return self.__str__()
-        
-    @staticmethod
-    def create(line):
-        d, w, tf, *pos = line.strip().split(',')
-        return PostingInfo(d, tf and int(tf), pos, w and float(w))
+    def write_to_index(self):
+        # doc,w,pos
+        w = p = ''
+        if self.weight:
+            w = f"{self.weight:.6f}"
+        if self.positions:
+            p = ',' + self.positions
+        return f"{self.doc_id},{w}{p}"
 
 
 class Indexer:
@@ -83,7 +91,7 @@ class Indexer:
 
         # VSM
         self.__n_doc_indexed = 0
-        self.term_doc_weights = {}   # term_doc_weights keeps the information for either bm25 o 
+        self.term_doc_weights = {}   # term_doc_weights keeps the information for either bm25 o
 
         # BM25
         self.document_lens = {}     # saves the number of words for each document
@@ -195,9 +203,8 @@ class Indexer:
             self.__block_cnt += 1
 
             for term in sorted(self.index):
-                    
+                f.write(term)
                 # term doc1,w,tf,pos1,pos2 doc2,pos1
-                postings = []
                 for doc in self.index[term]:
                     weight = positions = None
 
@@ -207,16 +214,15 @@ class Indexer:
                         positions = self.index[term][doc]
 
                     tf = self.term_frequency[term][doc]
-                    postings.append(PostingInfo(doc, tf, positions, weight))
+                    f.write(" " + PostingInfo(doc, tf,
+                                              positions, weight).write_to_block())
+                f.write("\n")
+                self.term_info.setdefault(
+                    term, TermInfo()).posting_size += len(self.index[term])
 
-                write = f"{term} {' '.join(str(post) for post in postings)}\n"
-            
-                f.write(write)
-                self.term_info.setdefault(term, TermInfo()).posting_size += len(self.index[term])
-
-            self.index.clear()
-            self.term_doc_weights.clear()
-            self.term_frequency.clear()
+        self.index.clear()
+        self.term_doc_weights.clear()
+        self.term_frequency.clear()
 
     def write_indexer_config(self):
         """Saves the current configuration as metadata."""
@@ -257,7 +263,7 @@ class Indexer:
 
             # term idf file_location_step
             for term in sorted(self.term_info):
-                f.write(f"{term},{self.term_info[term]}\n")
+                f.write(f"{term},{self.term_info[term].write()}\n")
 
     def read_term_info_memory(self):
         """Reads term information from metadata."""
@@ -306,10 +312,10 @@ class Indexer:
         """
         if self.file_location_step == 1:
             return self.term_info[term].position
-    
+
         # binary search
         sorted_term_info = sorted(self.term_info.keys())
-        
+
         low = index = 0
         high = len(sorted_term_info) - 1
         while low <= high:
@@ -336,15 +342,15 @@ class Indexer:
 
             while (line := f.readline()):
 
-                if self.positional:
-                    # TODO: positions are not being used
-                    term_r, *postings = line.strip().split(" ")
-                    postings = [post.split(',')[:2] for post in postings]
-                else:
-                    term_r, *postings = line.strip().split(" ")
-                    postings = [post.split(',') for post in postings]
+                term_r, *postings = line.strip().split(" ")
 
                 if term == term_r:
+                    if self.positional:
+                        # TODO: positions are not being used
+                        postings = [post.split(',')[:2] for post in postings]
+                    else:
+                        postings = [post.split(',') for post in postings]
+
                     weights = [post[1] for post in postings]
                     if self.rename_doc:
                         postings = [self.doc_ids[post[0]] for post in postings]
@@ -373,9 +379,11 @@ class Indexer:
             idf = self.term_info[term].idf
             if self.file_location_step:
                 term_location = self.__get_term_location(term)
-                weights, postings = self.__get_term_postings_from_file(term, term_file, term_location - 1)
+                weights, postings = self.__get_term_postings_from_file(
+                    term, term_file, term_location - 1)
             else:
-                weights, postings = self.__get_term_postings_from_file(term, term_file)
+                weights, postings = self.__get_term_postings_from_file(
+                    term, term_file)
             return idf, weights, postings
 
         logging.warning(f"Ignoring term \"{term}\"")
@@ -422,7 +430,7 @@ class Indexer:
 
     def open_merge_file(self, filename, mode="w"):
         """Open and return a index file."""
-        
+
         if self.save_zip and not filename.endswith(".gz"):
             filename += ".gz"
 
@@ -447,6 +455,7 @@ class Indexer:
         last_terms = [None for _ in range(len(blocks))]
         last_term = None                                    # keeps the min last term
 
+        curr = 0
         while blocks or terms:
             b = 0
             while b != len(blocks):
@@ -464,30 +473,40 @@ class Indexer:
                     for term_postings in chunk:
                         term, *postings = term_postings.strip().split(' ')
 
+                        postings_str = ""
                         for i in range(len(postings)):
                             postings[i] = PostingInfo.create(postings[i])
                             if self.ranking.name == "BM25":
-                                postings[i].weight = self.__calculate_ci(term, postings[i].doc_id, postings[i].term_freq)
+                                postings[i].weight = self.__calculate_ci(
+                                    term, postings[i].doc_id, postings[i].term_freq)
                             postings[i].term_freq = None
-                        
-                        terms.setdefault(term, list()).extend(postings)
+                            postings_str += f" {postings[i].write_to_index()}"
+                        curr += i
+
+                        terms.setdefault(term, ["", 0])
+                        terms[term][0] += postings_str
+                        terms[term][1] += i
                     last_terms[b] = term
                 b += 1
 
             # last_term is only updated if the list is not empty
             last_term = min(last_terms) if last_terms else last_term
 
+            if curr < self.merge_threshold and blocks:
+                continue
+
             total = 0
             sorted_terms = sorted(terms)
             for term in sorted_terms:
                 if term >= last_term:
                     break
-                total += len(terms[term])
+                total += terms[term][1]
                 if total >= self.merge_threshold:
                     break
 
             if total >= self.merge_threshold:
                 # write when the total terms postings exceed a threshold
+                curr -= total
                 self.__store_term_merged_file(terms, sorted_terms, term, True)
             elif not blocks:
                 # write the left terms in the last block
@@ -502,14 +521,14 @@ class Indexer:
         with self.open_merge_file(f"{self.merge_dir}{sorted_terms[0]} {last_term}.txt") as f:
             for ti, t in enumerate(sorted_terms):
                 if not threshold_term or t <= last_term:
-                    f.write(f"{t} {' '.join(str(post) for post in terms[t])}\n")
+                    f.write(f"{t}{terms[t][0]}\n")
                     if self.file_location_step and ti % self.file_location_step == 0:
                         self.term_info[t].position = ti + 1
                     del terms[t]
 
     def __next_doc_id(self):
         """Get the next alias for the document ID"""
-        
+
         # range of alias' alphabet in the ascii table
         max_char = 126
         min_char = 48
@@ -520,7 +539,7 @@ class Indexer:
             if ord(doc_id[i]) == max_char:
                 doc_id[i] = chr(min_char)
                 if i == -len(doc_id):
-                    doc_id[:0] = [chr(min_char - 1)] 
+                    doc_id[:0] = [chr(min_char - 1)]
             else:
                 doc_id[i] = chr(ord(doc_id[i]) + 1)
                 break
@@ -531,40 +550,42 @@ class Indexer:
 
     def __calculate_ranking_info(self, terms, doc):
         """Calculate the ranking info"""
-        
+
         if not self.ranking:
             return
 
         temp = [term for term, pos in terms]
+        unique_temp = set(temp)
 
-        if self.ranking.name == "VSM": 
+        if self.ranking.name == "VSM":
             cos_norm = 0
 
-            for term in set(temp):
+            for term in unique_temp:
                 self.term_doc_weights.setdefault(term, {})
                 self.term_frequency.setdefault(term, {})
-                
-                self.term_frequency[term][doc] = temp.count(term)
+
+                cnt = temp.count(term)
+                self.term_frequency[term][doc] = cnt
                 if self.ranking.p1[0] == "l":
                     # l**
-                    self.term_doc_weights[term][doc] = 1 + math.log10(temp.count(term))
+                    self.term_doc_weights[term][doc] = 1 + math.log10(cnt)
                 elif self.ranking.p1[0] == "n":
                     # n**
-                    self.term_doc_weights[term][doc] = temp.count(term)
-                
+                    self.term_doc_weights[term][doc] = cnt
+
                 cos_norm += self.term_doc_weights[term][doc]**2
-            
+
             if self.ranking.p1[2] == "c":
                 # **c
                 cos_norm = 1 / math.sqrt(cos_norm)
-                for term in set(temp):
+                for term in unique_temp:
                     self.term_doc_weights[term][doc] *= cos_norm
 
         elif self.ranking.name == "BM25":
             self.document_lens[doc] = len(terms)
             self.__total_doc_lens += len(terms)
-            
-            for term in set(temp):
+
+            for term in unique_temp:
                 self.term_frequency.setdefault(term, {})
                 self.term_frequency[term][doc] = temp.count(term)
 
