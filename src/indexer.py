@@ -19,7 +19,8 @@ class TermInfo():
         self.position = position or None
         self.idf = idf or None
 
-    def __str__(self): # podemos aqui nao escrever, acho q é so aqui, já esta a dar
+    def __str__(self):
+        # TODO: BM25 remove idf and fix this error
         return f"{self.idf or '':.6f},{self.position or ''}"
 
     def __repr__(self):
@@ -31,6 +32,29 @@ class TermInfo():
         return TermInfo(0,
             position and int(position), idf and float(idf))
     
+
+class PostingInfo():
+    # doc,w,tf,p1,p2    
+    def __init__(self, doc_id, term_freq, positions, weight=None):
+        self.doc_id = doc_id
+        self.positions = positions or []
+        self.weight = weight
+        self.term_freq = term_freq
+    
+    def __str__(self):
+        w = ''
+        if self.weight:
+            w = f"{self.weight:.6f}"
+        return f"{self.doc_id},{w},{self.term_freq or ''},{','.join(self.positions)}"
+
+    def __repr__(self):
+        return self.__str__()
+        
+    @staticmethod
+    def create(line):
+        d, w, tf, *pos = line.strip().split(',')
+        return PostingInfo(d, tf and int(tf), pos, w and float(w))
+
 
 class Indexer:
 
@@ -58,12 +82,13 @@ class Indexer:
         self.ranking = ranking
 
         # VSM
-        self.n_doc_indexed = 0
+        self.__n_doc_indexed = 0
         self.term_doc_weights = {}   # term_doc_weights keeps the information for either bm25 o 
 
         # BM25
         self.document_lens = {}     # saves the number of words for each document
         self.term_frequency = {}    # save
+        self.__total_doc_lens = 0
 
         # rename document ID
         self.__last_rename = ""
@@ -170,18 +195,28 @@ class Indexer:
             self.__block_cnt += 1
 
             for term in sorted(self.index):
-                if self.positional:
-                    # term doc1,pos1,pos2 doc2,pos1
-                    write = f"{term} {' '.join([doc + ',' + ','.join(self.index[term][doc]) for doc in self.index[term]])}\n"
-                else:
-                    # term doc1 doc2
-                    write = f"{term} {' '.join(self.index[term])}\n"
+                    
+                # term doc1,w,tf,pos1,pos2 doc2,pos1
+                postings = []
+                for doc in self.index[term]:
+                    weight = positions = None
 
+                    if self.ranking.name == 'VSM':
+                        weight = self.term_doc_weights[term][doc]
+                    if self.positional:
+                        positions = self.index[term][doc]
+
+                    tf = self.term_frequency[term][doc]
+                    postings.append(PostingInfo(doc, tf, positions, weight))
+
+                write = f"{term} {' '.join(str(post) for post in postings)}\n"
+            
                 f.write(write)
-                self.term_info.setdefault(
-                    term, TermInfo()).posting_size += len(self.index[term])
+                self.term_info.setdefault(term, TermInfo()).posting_size += len(self.index[term])
 
-            self.index = {}
+            self.index.clear()
+            self.term_doc_weights.clear()
+            self.term_frequency.clear()
 
     def write_indexer_config(self):
         """Saves the current configuration as metadata."""
@@ -304,17 +339,17 @@ class Indexer:
                 if self.positional:
                     # TODO: positions are not being used
                     term_r, *postings = line.strip().split(" ")
-                    postings = [pos.split(',')[:2] for pos in postings]
+                    postings = [post.split(',')[:2] for post in postings]
                 else:
                     term_r, *postings = line.strip().split(" ")
-                    postings = [pos.split(',') for pos in postings]
+                    postings = [post.split(',') for post in postings]
 
                 if term == term_r:
-                    weights = [pos[1] for pos in postings]
+                    weights = [post[1] for post in postings]
                     if self.rename_doc:
-                        postings = [self.doc_ids[pos[0]] for pos in postings]
+                        postings = [self.doc_ids[post[0]] for post in postings]
                     else:
-                        postings = [pos[0] for pos in postings]
+                        postings = [post[0] for post in postings]
                     return weights, postings
 
     def read_posting_lists(self, term):
@@ -418,24 +453,24 @@ class Indexer:
                 # check if the last_term is the same as the last_term for the block
                 if last_term == last_terms[b]:
                     f = blocks[b]
-                    docs = f.readlines(self.merge_chunk_size)
+                    chunk = f.readlines(self.merge_chunk_size)
                     # if the file ends it needs to be removed from the lists
-                    if not docs:
+                    if not chunk:
                         f.close()
                         del blocks[b]
                         del last_terms[b]
                         continue
 
-                    for doc in docs:
-                        line = doc.strip().split(' ')
-                        term, doc_lst = line[0], line[1:]
-                        if self.ranking:
-                            for i, doc_str in enumerate(doc_lst):
-                                doc = doc_str.split(',', 1)[0]
-                                # doc_lst[i] += ',' + self.term_doc_weights[term][doc]
-                                n = len(doc)
-                                doc_lst[i] = f"{doc_str[:n]},{self.term_doc_weights[term][doc]:.6f}{doc_str[n:]}"
-                        terms.setdefault(term, set()).update(doc_lst)
+                    for term_postings in chunk:
+                        term, *postings = term_postings.strip().split(' ')
+
+                        for i in range(len(postings)):
+                            postings[i] = PostingInfo.create(postings[i])
+                            if self.ranking.name == "BM25":
+                                postings[i].weight = self.__calculate_ci(term, postings[i].doc_id, postings[i].term_freq)
+                            postings[i].term_freq = None
+                        
+                        terms.setdefault(term, list()).extend(postings)
                     last_terms[b] = term
                 b += 1
 
@@ -467,7 +502,7 @@ class Indexer:
         with self.open_merge_file(f"{self.merge_dir}{sorted_terms[0]} {last_term}.txt") as f:
             for ti, t in enumerate(sorted_terms):
                 if not threshold_term or t <= last_term:
-                    f.write(f"{t} {' '.join(sorted(terms[t]))}\n")
+                    f.write(f"{t} {' '.join(str(post) for post in terms[t])}\n")
                     if self.file_location_step and ti % self.file_location_step == 0:
                         self.term_info[t].position = ti + 1
                     del terms[t]
@@ -507,6 +542,9 @@ class Indexer:
 
             for term in set(temp):
                 self.term_doc_weights.setdefault(term, {})
+                self.term_frequency.setdefault(term, {})
+                
+                self.term_frequency[term][doc] = temp.count(term)
                 if self.ranking.p1[0] == "l":
                     # l**
                     self.term_doc_weights[term][doc] = 1 + math.log10(temp.count(term))
@@ -524,6 +562,7 @@ class Indexer:
 
         elif self.ranking.name == "BM25":
             self.document_lens[doc] = len(terms)
+            self.__total_doc_lens += len(terms)
             
             for term in set(temp):
                 self.term_frequency.setdefault(term, {})
@@ -581,12 +620,10 @@ class Indexer:
                     continue
 
                 self.index_terms(terms, doc)
-                self.n_doc_indexed += 1
+                self.__n_doc_indexed += 1
 
         if self.ranking:
             self.__calculate_idf()
-            if self.ranking.name == "BM25":
-                self.__calculate_ci()
 
         self.merge_block_disk()
         self.write_term_info_disk()
@@ -599,24 +636,17 @@ class Indexer:
 
         for term in self.term_info:
             document_frequency = self.term_info[term].posting_size
-            idf = math.log10(self.n_doc_indexed / document_frequency)
+            idf = math.log10(self.__n_doc_indexed / document_frequency)
             self.term_info[term].idf = idf
 
-    def __calculate_ci(self):
+    def __calculate_ci(self, term, doc, term_frequency):
         """Calculate BM25 weights for each term-doc."""
 
-        self.term_doc_weights = {}     # {term : {doc: ci}}
-        avdl = sum(self.document_lens.values()) / len(self.document_lens)
+        avdl = self.__total_doc_lens / self.__n_doc_indexed
+        idf = self.term_info[term].idf
+        document_len = self.document_lens[doc]
 
-        for term in self.term_frequency:
-            idf = self.term_info[term].idf
+        ci = idf * (self.ranking.k1 + 1) * term_frequency / (self.ranking.k1 *
+            ((1 - self.ranking.b) + self.ranking.b * document_len/avdl) + term_frequency)
 
-            for doc in self.term_frequency[term]:
-                term_frequency = self.term_frequency[term][doc]
-                document_len = self.document_lens[doc]
-
-                ci = idf * (self.ranking.k1 + 1) * term_frequency / (self.ranking.k1 *
-                    ((1 - self.ranking.b) + self.ranking.b * document_len/avdl) + term_frequency)
-                
-                self.term_doc_weights.setdefault(term, {})
-                self.term_doc_weights[term][doc] = ci
+        return ci

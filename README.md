@@ -157,7 +157,7 @@ lnc.ltc = 106sec 30MB 0.24 2.47
 
 music:
 
-ltc.lnc = 504sec 909MB 0.87 24.05
+lnc.ltc = 504sec 909MB 0.87 24.05
         = 812sec 263MB 2.07 14.88
 
 games:
