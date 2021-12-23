@@ -260,14 +260,14 @@ uses a contraction file that has many english contractions. If a token matches o
 `--name {VSM,BM25}`\
 the type of the ranking that the indexer has to follow when running a query.
 
-`p1 SCHEME`\
+`-p1 SCHEME`\
 the weighting scheme in SMART notation for the document. Used by VSM.
 
-`p2 SCHEME`\
+`-p2 SCHEME`\
 the weighting scheme in SMART notation for the query. Used by VSM.
 
-`k1 N`\
+`-k1 N`\
 controls the term frequency scaling. k1 = 0 is a binary model, while a large k1 is a raw term frequency. Typically, k1 is set around 1.2–2. Used by BM25.
 
-`b N`\
+`-b N`\
 controls the document length normalization. b = 0 is no length normalization, while b = 1 is relative frequency. Typically, b around 0.75. Used by BM25.

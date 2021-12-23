@@ -121,7 +121,7 @@ if __name__ == "__main__":
                         help='replace tokens from a contractions file (default: %(default)s)')
 
     group3 = d_parser.add_argument_group('ranking optional arguments')
-    group3.add_argument('--name', choices=['VSM', 'BM25'], default="BM25",
+    group3.add_argument('-n, --name', choices=['VSM', 'BM25'], default="BM25",
                         help='the type of ranking (default: %(default)s)')
     group3.add_argument('-p1', metavar='SCHEME', type=str, default="lnc",
                         help='document scheme (default: %(default)s)')

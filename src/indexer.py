@@ -554,17 +554,19 @@ class Indexer:
         if not self.ranking:
             return
 
-        temp = [term for term, pos in terms]
-        unique_temp = set(temp)
+        terms_cnt = {}
+        for term, pos in terms:
+            terms_cnt.setdefault(term, 0)
+            terms_cnt[term] += 1
 
         if self.ranking.name == "VSM":
             cos_norm = 0
 
-            for term in unique_temp:
+            for term in terms_cnt:
                 self.term_doc_weights.setdefault(term, {})
                 self.term_frequency.setdefault(term, {})
 
-                cnt = temp.count(term)
+                cnt = terms_cnt[term]
                 self.term_frequency[term][doc] = cnt
                 if self.ranking.p1[0] == "l":
                     # l**
@@ -578,16 +580,16 @@ class Indexer:
             if self.ranking.p1[2] == "c":
                 # **c
                 cos_norm = 1 / math.sqrt(cos_norm)
-                for term in unique_temp:
+                for term in terms_cnt:
                     self.term_doc_weights[term][doc] *= cos_norm
 
         elif self.ranking.name == "BM25":
             self.document_lens[doc] = len(terms)
             self.__total_doc_lens += len(terms)
 
-            for term in unique_temp:
+            for term in terms_cnt:
                 self.term_frequency.setdefault(term, {})
-                self.term_frequency[term][doc] = temp.count(term)
+                self.term_frequency[term][doc] = terms_cnt[term]
 
     def index_terms(self, terms, doc):
         """
