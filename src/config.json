@@ -1,12 +1,12 @@
 {
   "indexer": {
     "positional": false,
-    "save_zip": false,
-    "rename_doc": false,
-    "file_location_step": 0,
+    "save_zip": true,
+    "rename_doc": true,
+    "file_location_step": 1,
     "block_threshold": 1000000,
     "merge_threshold": 1000000,
-    "merge_chunk_size": 1000,
+    "merge_chunk_size": 5000000,
     "merge_dir": "indexer/"
   },
   "tokenizer": {
@@ -20,6 +20,6 @@
   "ranking": {
     "name": "BM25",
     "b": 0.75,
-    "k1": 1.2
+    "k1": 1.2,
   }
 }
