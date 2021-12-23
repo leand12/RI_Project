@@ -220,6 +220,7 @@ class Indexer:
                 self.term_info.setdefault(
                     term, TermInfo()).posting_size += len(self.index[term])
 
+        # frees memory
         self.index.clear()
         self.term_doc_weights.clear()
         self.term_frequency.clear()
@@ -345,18 +346,21 @@ class Indexer:
                 term_r, *postings = line.strip().split(" ")
 
                 if term == term_r:
-                    if self.positional:
-                        # TODO: positions are not being used
-                        postings = [post.split(',')[:2] for post in postings]
-                    else:
-                        postings = [post.split(',') for post in postings]
+                    weights = []
+                    docs = []
+                    for post in postings:
+                        # post -> doc_id,weigth,pos1,pos2...
+                        # positions are not necessary for now so they are skipped
 
-                    weights = [post[1] for post in postings]
-                    if self.rename_doc:
-                        postings = [self.doc_ids[post[0]] for post in postings]
-                    else:
-                        postings = [post[0] for post in postings]
-                    return weights, postings
+                        temp = post.split(",")
+                        weights.append(temp[1])
+                        
+                        if self.rename_doc:                        
+                            docs.append(self.doc_ids[temp[0]])
+                        else:
+                            docs.append(temp[0])
+                            
+                    return weights, docs
 
     def read_posting_lists(self, term):
         """Reads the posting list of a term from disk."""
@@ -451,9 +455,9 @@ class Indexer:
         blocks = [open(block, "r")
                   for block in glob.glob(f"{self.merge_dir}block/*")]
         terms = {}
-        # keeps the last term for every block
-        last_terms = [None for _ in range(len(blocks))]
-        last_term = None                                    # keeps the min last term
+        
+        last_terms = [None for _ in range(len(blocks))] # last term for every block
+        last_term = None                                # min last term
 
         curr = 0
         while blocks or terms:
@@ -477,6 +481,13 @@ class Indexer:
                         for i in range(len(postings)):
                             postings[i] = PostingInfo.create(postings[i])
                             if self.ranking.name == "BM25":
+                                # bm25 weights are calculated before being written to disk
+                                # this way they are not kept in memory for long and can
+                                # free space whenever they are written
+                                
+                                # vsm weights were written to the blocks and now only the chunks
+                                # are loaded into memory, so they are in memory for a short time aswell
+                                
                                 postings[i].weight = self.__calculate_ci(
                                     term, postings[i].doc_id, postings[i].term_freq)
                             postings[i].term_freq = None
@@ -492,9 +503,12 @@ class Indexer:
             # last_term is only updated if the list is not empty
             last_term = min(last_terms) if last_terms else last_term
 
+            # checks if the current number of posts in the dict is at least higher than the threshold
+            # if not there is no need to run the following code
             if curr < self.merge_threshold and blocks:
                 continue
 
+            # checks which terms can be written to disk and calculates the size of their posting lists
             total = 0
             sorted_terms = sorted(terms)
             for term in sorted_terms:
@@ -534,6 +548,8 @@ class Indexer:
         min_char = 48
 
         doc_id = list(self.__last_rename) or list(chr(min_char))
+        
+        # calculates the doc id by adding one to the last one
         i = -1
         while True:
             if ord(doc_id[i]) == max_char:
@@ -560,6 +576,9 @@ class Indexer:
             terms_cnt[term] += 1
 
         if self.ranking.name == "VSM":
+            # calculates weights depending on the schema provided
+            # stores term frequency to be used on the blocks
+
             cos_norm = 0
 
             for term in terms_cnt:
@@ -584,6 +603,7 @@ class Indexer:
                     self.term_doc_weights[term][doc] *= cos_norm
 
         elif self.ranking.name == "BM25":
+            # stores the information of the document lengths and the term frequency for each term-doc
             self.document_lens[doc] = len(terms)
             self.__total_doc_lens += len(terms)
 

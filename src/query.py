@@ -80,48 +80,50 @@ class Query:
             return self.bm25_score(terms)[:100]
 
     def tf_idf_score(self, terms):
+        """Sort and rank the documents according to VSM"""
 
         scores = {}
         cos_norm = 0
         for term in set(terms):
             if (term_info := self.indexer.read_posting_lists(term)):
                 idf, weights, postings = term_info
-
-                tf = terms.count(term)  # n**
-                dc = 1                  # *n*
+                cnt = terms.count(term)
+                tf = cnt    # term frequency (natural) n**
+                dc = 1      # document frequency (no) *n*
 
                 if self.indexer.ranking.p2[0] == 'l':
-                    # l**
+                    # term frequency (logarithm) l**
                     tf = 1 + math.log10(tf)
 
                 if self.indexer.ranking.p2[1] == 't':
-                    # *t*
+                    # document frequency (idf) *t*
                     dc = float(idf)
 
                 lt = tf * dc
                 cos_norm += lt**2
                 for i, doc in enumerate(postings):
                     scores.setdefault(doc, 0)
-                    scores[doc] += float(weights[i]) * lt * terms.count(term)
+                    scores[doc] += float(weights[i]) * lt * cnt
 
         if scores:
             if self.indexer.ranking.p2[2] == 'c':
-                # **c
+                # normalization (cosine) **c
                 cos_norm = 1 / math.sqrt(cos_norm)
                 for doc in scores:
                     scores[doc] *= cos_norm
             return sorted(scores.items(), key=lambda x: -x[1])
 
     def bm25_score(self, terms):
+        """Sort and rank the documents according to BM25"""
 
         scores = {}
         for term in set(terms):
             if (term_info := self.indexer.read_posting_lists(term)):
                 _, weights, postings = term_info
-
+                cnt = term.count(term)
                 for i, doc in enumerate(postings):
                     scores.setdefault(doc, 0)
-                    scores[doc] += float(weights[i]) * terms.count(term)
+                    scores[doc] += float(weights[i]) * cnt
 
         if scores:
             return sorted(scores.items(), key=lambda x: -x[1])
