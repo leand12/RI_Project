@@ -211,7 +211,7 @@ class Indexer:
                     if self.ranking.name == 'VSM':
                         weight = self.term_doc_weights[term][doc]
                     if self.positional:
-                        positions = self.index[term][doc]
+                        positions = ','.join(self.index[term][doc])
 
                     tf = self.term_frequency[term][doc]
                     f.write(" " + PostingInfo(doc, tf,
@@ -347,18 +347,18 @@ class Indexer:
 
                 if term == term_r:
                     weights = []
-                    docs = []
+                    docs = {}
                     for post in postings:
                         # post -> doc_id,weigth,pos1,pos2...
-                        # positions are not necessary for now so they are skipped
 
-                        temp = post.split(",")
-                        weights.append(temp[1])
+                        # TODO: return pos
+                        doc_id, ws, *ps = post.split(",")
+                        weights.append(ws)
                         
                         if self.rename_doc:                        
-                            docs.append(self.doc_ids[temp[0]])
+                            docs[self.doc_ids[doc_id]] = ps
                         else:
-                            docs.append(temp[0])
+                            docs[doc_id] = ps
                             
                     return weights, docs
 
@@ -479,7 +479,7 @@ class Indexer:
 
                         postings_str = ""
                         for i in range(len(postings)):
-                            postings[i] = PostingInfo.create(postings[i])
+                            postings[i] = PostingInfo.create(postings[i], self.positional)
                             if self.ranking.name == "BM25":
                                 # bm25 weights are calculated before being written to disk
                                 # this way they are not kept in memory for long and can

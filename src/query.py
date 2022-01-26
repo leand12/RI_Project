@@ -4,6 +4,7 @@ import math
 import logging
 import os
 import time
+from turtle import pos, position
 
 
 class Ranking:
@@ -43,8 +44,9 @@ class BM25(Ranking):
 
 class Query:
 
-    def __init__(self, indexer):
+    def __init__(self, indexer, window=5):
         self.indexer = indexer
+        self.window_size = window
 
     def search_file(self, filename):
         
@@ -79,6 +81,7 @@ class Query:
         elif self.indexer.ranking.name == "BM25":
             return self.bm25_score(terms)[:100]
 
+
     def tf_idf_score(self, terms):
         """Sort and rank the documents according to VSM"""
 
@@ -101,7 +104,7 @@ class Query:
 
                 lt = tf * dc
                 cos_norm += lt**2
-                for i, doc in enumerate(postings):
+                for i, doc in enumerate(postings.keys()):
                     scores.setdefault(doc, 0)
                     scores[doc] += float(weights[i]) * lt * cnt
 
@@ -117,13 +120,86 @@ class Query:
         """Sort and rank the documents according to BM25"""
 
         scores = {}
+        term_postings = {}
         for term in set(terms):
             if (term_info := self.indexer.read_posting_lists(term)):
                 _, weights, postings = term_info
+                term_postings[term] = postings
                 cnt = term.count(term)
-                for i, doc in enumerate(postings):
+                for i, doc in enumerate(postings.keys()):
                     scores.setdefault(doc, 0)
                     scores[doc] += float(weights[i]) * cnt
-
+        scores = self.boost_query(terms, term_postings, scores)
         if scores:
             return sorted(scores.items(), key=lambda x: -x[1])
+
+    def boost_query(self, terms, term_postings, scores):
+        # query = List[term]
+
+        positions = {}
+        for doc in scores:
+            positions[doc] = []
+            for term in term_postings:
+                if doc in term_postings[term]:
+                    positions[doc].extend(
+                        [(term, int(pos)) for pos in term_postings[term][doc]]
+                    )                
+
+            positions[doc].sort(key=lambda x: x[1])
+
+        for doc in positions:
+            d_pos = positions[doc]
+            boost = 0
+            for i in range(len(d_pos)):
+                window = [d_pos[i]]                
+                
+                ci = d_pos[i][1]
+                while i + 1 < len(d_pos) and d_pos[i + 1][1] - ci < self.window_size:
+                    i += 1
+                    window.append(d_pos[i])
+                    
+                boost += self.__evaluate_window(terms, window)
+                
+            scores[doc] += boost
+        
+        return scores    
+    
+    def __evaluate_window(self, terms, window):
+        
+        
+        # n de termos na query
+        temp = terms[:]
+        count = 0
+        for term, pos in window:
+            if term in temp:
+                count += 1
+                temp.pop(temp.index(term))
+
+        # levenshtein distance #TODO: make it better
+        ld = 0
+        initial_d = window[0][1]        # distance of the first element in the window
+        for term, pos in window:
+            if pos - initial_d < len(terms) and terms[pos-initial_d] == term:
+                ld += 1
+            
+        # distance between words
+        td = 0
+        for i in range(len(window) - 1):
+            for j in range(i + 1, len(window)):
+                td += window[j][1] - window[i][1]
+         
+        return count * 0.5 + ld * 0.25 + td * 0.25
+        
+        """
+            Window: [('rock', 88), ('rock', 90)]
+            Termos query: 1
+            Leven distance: 0
+            Words Distance: 2
+        """        
+    
+#  term -> doc -> [pos]
+
+# doc -> [ (term1, 1), (term1, 3), (term2, 5) ]
+
+
+# t1 t2 . . t3 t2 . t1
