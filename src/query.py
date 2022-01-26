@@ -6,6 +6,8 @@ import os
 import time
 from turtle import pos, position
 
+from sklearn.metrics import accuracy_score
+
 
 class Ranking:
 
@@ -77,9 +79,9 @@ class Query:
             return None
 
         if self.indexer.ranking.name == "VSM":
-            return self.tf_idf_score(terms)[:100]
+            return self.tf_idf_score(terms)[:10]
         elif self.indexer.ranking.name == "BM25":
-            return self.bm25_score(terms)[:100]
+            return self.bm25_score(terms)[:10]
 
 
     def tf_idf_score(self, terms):
@@ -87,9 +89,11 @@ class Query:
 
         scores = {}
         cos_norm = 0
+        term_postings = {}
         for term in set(terms):
             if (term_info := self.indexer.read_posting_lists(term)):
                 idf, weights, postings = term_info
+                term_postings[term] = postings
                 cnt = terms.count(term)
                 tf = cnt    # term frequency (natural) n**
                 dc = 1      # document frequency (no) *n*
@@ -114,6 +118,8 @@ class Query:
                 cos_norm = 1 / math.sqrt(cos_norm)
                 for doc in scores:
                     scores[doc] *= cos_norm
+            scores = self.boost_query(terms, term_postings, scores)
+            
             return sorted(scores.items(), key=lambda x: -x[1])
 
     def bm25_score(self, terms):
@@ -129,8 +135,8 @@ class Query:
                 for i, doc in enumerate(postings.keys()):
                     scores.setdefault(doc, 0)
                     scores[doc] += float(weights[i]) * cnt
-        scores = self.boost_query(terms, term_postings, scores)
         if scores:
+            scores = self.boost_query(terms, term_postings, scores)
             return sorted(scores.items(), key=lambda x: -x[1])
 
     def boost_query(self, terms, term_postings, scores):
@@ -180,7 +186,7 @@ class Query:
         initial_d = window[0][1]        # distance of the first element in the window
         for term, pos in window:
             if pos - initial_d < len(terms) and terms[pos-initial_d] == term:
-                ld += 1
+                ld += pos-initial_d - terms.index(term)
             
         # distance between words
         td = 0
@@ -188,7 +194,7 @@ class Query:
             for j in range(i + 1, len(window)):
                 td += window[j][1] - window[i][1]
          
-        return count * 0.5 + ld * 0.25 + td * 0.25
+        return count * 0.05 + ld * 0.25 + td * 0.25
         
         """
             Window: [('rock', 88), ('rock', 90)]
@@ -197,6 +203,29 @@ class Query:
             Words Distance: 2
         """        
     
+    
+    def metrics(self, real, predicted):
+        
+        tp = 0
+        for doc in predicted:
+            if doc in real:
+                tp += 1
+        
+        fn = fp = len(predicted) - tp       # since we are only looking at a fixed amount of docs
+            
+        # Accuracy = (TP + TN) / (TP + FP + FN + TN)    
+        # TODO: not sure??
+        
+        # Precision = TP / TP + FP
+        precision = tp / (tp + fp)
+        
+        # Recall = TP / TP + FN
+        recall = tp / (tp + fn)
+        
+        # F-Measure = 2RP / (R + P)
+        f1_score = 2*recall*precision / (recall + precision) 
+        
+        
 #  term -> doc -> [pos]
 
 # doc -> [ (term1, 1), (term1, 3), (term2, 5) ]
