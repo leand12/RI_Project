@@ -4,10 +4,12 @@
 import math
 import logging
 import os
+from random import random
 import time
 
 from tabulate import tabulate
-
+from utils import levenshtein
+import numpy as np
 
 class Ranking:
 
@@ -74,18 +76,33 @@ class Query:
                     q.write("\n")
 
     def search_file_with_accuracy(self, filename):
+
+        all_data = []
+        header = ["Top K", "Precision", "Recall", "F-Measure", "Average Precision", "NDCG"]
       
         with open(filename, "r") as f:
 
             for line in f:
                 if line.startswith("Q:"):
+                    print('\n', "Metrics for", line)
                     query = line[2:].strip()
                     docs = []
                     while (line := f.readline().strip()):
                         temp = line.split()
                         docs.append((temp[0], int(temp[1])))
 
-                    self.metrics(docs, self.search(query, top=50))
+                    data = self.metrics(docs, self.search(query, top=50))
+                    all_data.append(data)
+                    print(tabulate([header, *data], headers="firstrow", floatfmt='.3f'))
+
+        avg_data = np.array(all_data[0])
+        for data in all_data[1:]:
+            avg_data += np.array(data)
+        avg_data /= len(all_data)
+
+        print('\n', "Metrics for all queries")
+        print(tabulate([header, *avg_data], headers="firstrow", floatfmt='.3f'))
+
 
     def search(self, query, top=10):
 
@@ -173,17 +190,17 @@ class Query:
             boost = 0
             # slide window so that it starts on query token
             for i in range(len(d_pos)):
-                window = [d_pos[i]]
-
+                window = [None] * self.window_size
+                window[0] = d_pos[i][0]
+                fi = i
                 ci = d_pos[i][1]
                 while i + 1 < len(d_pos) and d_pos[i + 1][1] - ci < self.window_size:
+                    window[d_pos[i + 1][1] - ci] = d_pos[i][0]
                     i += 1
-                    window.append(d_pos[i])
+                if fi != i:
+                    boost += self.__evaluate_window(terms, window)
 
-                boost += self.__evaluate_window(terms, window)
-
-            #scores[doc] += boost
-
+            scores[doc] += boost/len(d_pos)
         return scores
 
     def __evaluate_window(self, terms, window):
@@ -191,26 +208,16 @@ class Query:
         # n de termos na query
         temp = terms[:]
         count = 0
-        for term, pos in window:
+        for term in window:
             if term in temp:
                 count += 1
                 temp.pop(temp.index(term))
+ 
+        count -= 1
+        count += 0.1 * (len(window) - count + 1)
+        count += len(terms) - levenshtein(terms, window)
 
-        # levenshtein distance #TODO: make it better
-        ld = 0
-        # distance of the first element in the window
-        initial_d = window[0][1]
-        for term, pos in window:
-            if pos - initial_d < len(terms) and terms[pos-initial_d] == term:
-                ld += pos-initial_d - terms.index(term)
-
-        # distance between words
-        td = 0
-        for i in range(len(window) - 1):
-            for j in range(i + 1, len(window)):
-                td += window[j][1] - window[i][1]
-
-        return count * 0.05 + ld * 0.25 + td * 0.25
+        return (0.5 * count)**2
 
         """
             Window: [('rock', 88), ('rock', 90)]
@@ -220,8 +227,8 @@ class Query:
         """
 
     def metrics(self, real, predicted):
-        data = [["Top K", "Precision", "Recall", "F-Measure", "Average Precision", "NDCG"]]
 
+        data = []
         real_docs = set(doc for doc, _ in real)
         for k in (10, 20, 50):
             precisions = []
@@ -238,7 +245,7 @@ class Query:
 
                 precisions.append(tp/(i+1))
 
-            idcg = sum(r / math.log2(i + 2) for i, r in enumerate(sorted(rankings, reverse=True)))
+            idcg = sum(r[1] / math.log2(i + 2) for i, r in enumerate(real[:k]))
             dcg = sum(r / math.log2(i + 2) for i, r in enumerate(rankings))
             ndcg = dcg / idcg if idcg else 0
 
@@ -259,19 +266,4 @@ class Query:
 
             data.append([k, precision, recall, f1_score, avg_precisions, ndcg])
 
-        print(tabulate(data, floatfmt=".3f"))
-
-        # i. Precision
-        # ii. Recall
-        # iii. F-measure
-        # iv. Average Precision(AP)
-        # v. Normalized Discounted Cumulative Gain (NDCG)
-        # vi. Average query throughput
-        # vii. Median query latency
-
-#  term -> doc -> [pos]
-
-# doc -> [ (term1, 1), (term1, 3), (term2, 5) ]
-
-
-# t1 t2 . . t3 t2 . t1
+        return data
