@@ -48,7 +48,7 @@ def search_indexer(args):
 
     if args.query:
         start = time.perf_counter()
-        query.search_file(args.query)
+        query.search_file_with_accuracy(args.query)
         logging.info(f"Total time taken to search for queries: {time.perf_counter() - start:.2f} seconds")
 
     else:
@@ -138,6 +138,8 @@ if __name__ == "__main__":
                           help='source directory of an indexer')
     i_parser.add_argument('-q', '--query', metavar='FILE',
                           help='text file with multiple queries separated by a new line')
+    # i_parser.add_argument('-a', '--query', metavar='FILE',
+    #                       help='text file with multiple queries separated by a new line')
 
     args = parser.parse_args()
 
