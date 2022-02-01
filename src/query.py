@@ -217,10 +217,10 @@ class Query:
                     while window[-1] == None:
                         window.pop()
 
-                    boost = max(boost, self.__evaluate_window(terms, window))
+                    boost += self.__evaluate_window(terms, window)
 
-            score = boost/len(d_pos)
-            scores[doc] += scores[doc]*score
+            score = 0.8 * boost / len(d_pos)**2
+            scores[doc] += scores[doc] * score
 
         # print('\n'.join(b[0] + '\t' + str(b[1]) for b in sorted(all_boost, key=lambda x: x[1])))
         # print('\n'*4)
@@ -233,7 +233,7 @@ class Query:
         # count += 0.1 * (sum(1 for x in window if x) - count + 1)
         count += len(terms) - levenshtein(terms, window)
 
-        return count**2 / (len(window) + len(terms))**2
+        return (count / (len(window) + len(terms)))**(1 if self.indexer.ranking.name == "VSM" else 2)
 
     def metrics(self, real, predicted):
 
