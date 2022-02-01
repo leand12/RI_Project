@@ -12,6 +12,7 @@ from utils import levenshtein
 import numpy as np
 from typing import List
 
+
 class Ranking:
 
     def __init__(self, name, p1, p2):
@@ -79,13 +80,16 @@ class Query:
     def search_file_with_accuracy(self, filename):
 
         all_data = []
-        header = ["Top K", "Precision", "Recall", "F-Measure", "Average Precision", "NDCG"]
-      
+        header = ["Top K", "Precision", "Recall",
+                  "F-Measure", "Average Precision", "NDCG"]
+
+        start = time.perf_counter()
+        queries = 0
         with open(filename, "r") as f:
 
             for line in f:
                 if line.startswith("Q:"):
-                    # print('\n', "Metrics for", line)
+                    queries += 1
                     query = line[2:].strip()
                     docs = []
                     while (line := f.readline().strip()):
@@ -94,7 +98,15 @@ class Query:
 
                     data = self.metrics(docs, self.search(query, top=50))
                     all_data.append(data)
-                    # print(tabulate([header, *data], headers="firstrow", floatfmt='.3f'))
+
+        total_time = time.perf_counter() - start
+
+        logging.info(
+            f"Query Throughput: {queries / total_time:.2f} queries/second")
+        logging.info(
+            f"Query Execution Time: {total_time / queries:.2f} seconds/query")
+        logging.info(
+            f"Total time taken to search for all queries: {total_time:.2f} seconds")
 
         avg_data = np.array(all_data[0])
         for data in all_data[1:]:
@@ -102,8 +114,8 @@ class Query:
         avg_data /= len(all_data)
 
         print('\n', "Metrics for all queries")
-        print(tabulate([header, *avg_data], headers="firstrow", floatfmt='.3f'))
-
+        print(tabulate([header, *avg_data],
+              headers="firstrow", floatfmt='.3f'))
 
     def search(self, query, top=10):
 
@@ -191,13 +203,13 @@ class Query:
             for i in range(len(d_pos)):
                 window = [None] * self.window_size
                 window[0] = d_pos[i][0]
-                
+
                 tempi = i
                 start = d_pos[i][1]
                 while i + 1 < len(d_pos) and d_pos[i + 1][1] - start < self.window_size:
                     window[d_pos[i + 1][1] - start] = d_pos[i + 1][0]
                     i += 1
-                
+
                 if i > tempi:
                     if len(set(window)) <= 2:
                         continue
@@ -217,18 +229,11 @@ class Query:
     def __evaluate_window(self, terms, window):
 
         # n de termos na query
-        count = len(set(x for x in window if x)) # windowsize
+        count = len(set(x for x in window if x))  # windowsize
         # count += 0.1 * (sum(1 for x in window if x) - count + 1)
         count += len(terms) - levenshtein(terms, window)
 
         return count**2 / (len(window) + len(terms))**2
-
-        """
-            Window: [('rock', 88), ('rock', 90)]
-            Termos query: 1
-            Leven distance: 0
-            Words Distance: 2
-        """
 
     def metrics(self, real, predicted):
 
@@ -249,8 +254,10 @@ class Query:
 
                 precisions.append(tp/(i+1))
 
-            idcg = real[0][1] + sum(r[1] / math.log2(i + 2) for i, r in enumerate(real[1:k]))
-            dcg = rankings[0] + sum(r / math.log2(i + 2) for i, r in enumerate(rankings[1:]))
+            idcg = real[0][1] + sum(r[1] / math.log2(i + 2)
+                                    for i, r in enumerate(real[1:k]))
+            dcg = rankings[0] + sum(r / math.log2(i + 2)
+                                    for i, r in enumerate(rankings[1:]))
             ndcg = dcg / idcg if idcg else 0
 
             fp = k - tp
@@ -264,7 +271,8 @@ class Query:
             recall = tp / (tp + fn)
 
             # F-Measure = 2RP / (R + P)
-            f1_score = 2 * recall*precision / (recall + precision) if precision or recall else 0
+            f1_score = 2 * recall*precision / \
+                (recall + precision) if precision or recall else 0
 
             avg_precisions = sum(precisions) / len(precisions)
 

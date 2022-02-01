@@ -47,9 +47,7 @@ def search_indexer(args):
     query = Query(indexer)
 
     if args.query:
-        start = time.perf_counter()
         query.search_file_with_accuracy(args.query)
-        logging.info(f"Total time taken to search for queries: {time.perf_counter() - start:.2f} seconds")
 
     else:
         while True:
