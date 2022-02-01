@@ -354,12 +354,12 @@ class Indexer:
                         # TODO: return pos
                         doc_id, ws, *ps = post.split(",")
                         weights.append(ws)
-                        
+
                         if self.rename_doc:                        
                             docs[self.doc_ids[doc_id]] = ps
                         else:
                             docs[doc_id] = ps
-                            
+
                     return weights, docs
 
     def read_posting_lists(self, term):

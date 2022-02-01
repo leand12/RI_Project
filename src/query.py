@@ -10,6 +10,7 @@ import time
 from tabulate import tabulate
 from utils import levenshtein
 import numpy as np
+from typing import List
 
 class Ranking:
 
@@ -84,7 +85,7 @@ class Query:
 
             for line in f:
                 if line.startswith("Q:"):
-                    print('\n', "Metrics for", line)
+                    # print('\n', "Metrics for", line)
                     query = line[2:].strip()
                     docs = []
                     while (line := f.readline().strip()):
@@ -93,7 +94,7 @@ class Query:
 
                     data = self.metrics(docs, self.search(query, top=50))
                     all_data.append(data)
-                    print(tabulate([header, *data], headers="firstrow", floatfmt='.3f'))
+                    # print(tabulate([header, *data], headers="firstrow", floatfmt='.3f'))
 
         avg_data = np.array(all_data[0])
         for data in all_data[1:]:
@@ -116,7 +117,7 @@ class Query:
         elif self.indexer.ranking.name == "BM25":
             return self.bm25_score(terms)[:top]
 
-    def tf_idf_score(self, terms):
+    def tf_idf_score(self, terms: List[str]):
         """Sort and rank the documents according to VSM"""
 
         scores = {}
@@ -151,10 +152,9 @@ class Query:
                 for doc in scores:
                     scores[doc] *= cos_norm
             scores = self.boost_query(terms, term_postings, scores)
-
             return sorted(scores.items(), key=lambda x: -x[1])
 
-    def bm25_score(self, terms):
+    def bm25_score(self, terms: List[str]):
         """Sort and rank the documents according to BM25"""
 
         scores = {}
@@ -171,8 +171,7 @@ class Query:
             scores = self.boost_query(terms, term_postings, scores)
             return sorted(scores.items(), key=lambda x: -x[1])
 
-    def boost_query(self, terms, term_postings, scores):
-        # query = List[term]
+    def boost_query(self, terms: List[str], term_postings, scores):
 
         positions = {}
         for doc in scores:
@@ -192,32 +191,37 @@ class Query:
             for i in range(len(d_pos)):
                 window = [None] * self.window_size
                 window[0] = d_pos[i][0]
-                fi = i
-                ci = d_pos[i][1]
-                while i + 1 < len(d_pos) and d_pos[i + 1][1] - ci < self.window_size:
-                    window[d_pos[i + 1][1] - ci] = d_pos[i][0]
+                
+                tempi = i
+                start = d_pos[i][1]
+                while i + 1 < len(d_pos) and d_pos[i + 1][1] - start < self.window_size:
+                    window[d_pos[i + 1][1] - start] = d_pos[i + 1][0]
                     i += 1
-                if fi != i:
-                    boost += self.__evaluate_window(terms, window)
+                
+                if i > tempi:
+                    if len(set(window)) <= 2:
+                        continue
 
-            scores[doc] += boost/len(d_pos)
+                    while window[-1] == None:
+                        window.pop()
+
+                    boost = max(boost, self.__evaluate_window(terms, window))
+
+            score = boost/len(d_pos)
+            scores[doc] += scores[doc]*score
+
+        # print('\n'.join(b[0] + '\t' + str(b[1]) for b in sorted(all_boost, key=lambda x: x[1])))
+        # print('\n'*4)
         return scores
 
     def __evaluate_window(self, terms, window):
 
         # n de termos na query
-        temp = terms[:]
-        count = 0
-        for term in window:
-            if term in temp:
-                count += 1
-                temp.pop(temp.index(term))
- 
-        count -= 1
-        count += 0.1 * (len(window) - count + 1)
+        count = len(set(x for x in window if x)) # windowsize
+        # count += 0.1 * (sum(1 for x in window if x) - count + 1)
         count += len(terms) - levenshtein(terms, window)
 
-        return (0.5 * count)**2
+        return count**2 / (len(window) + len(terms))**2
 
         """
             Window: [('rock', 88), ('rock', 90)]
@@ -245,8 +249,8 @@ class Query:
 
                 precisions.append(tp/(i+1))
 
-            idcg = sum(r[1] / math.log2(i + 2) for i, r in enumerate(real[:k]))
-            dcg = sum(r / math.log2(i + 2) for i, r in enumerate(rankings))
+            idcg = real[0][1] + sum(r[1] / math.log2(i + 2) for i, r in enumerate(real[1:k]))
+            dcg = rankings[0] + sum(r / math.log2(i + 2) for i, r in enumerate(rankings[1:]))
             ndcg = dcg / idcg if idcg else 0
 
             fp = k - tp
