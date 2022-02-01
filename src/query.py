@@ -233,7 +233,7 @@ class Query:
         # count += 0.1 * (sum(1 for x in window if x) - count + 1)
         count += len(terms) - levenshtein(terms, window)
 
-        return (count / (len(window) + len(terms)))**(1 if self.indexer.ranking.name == "VSM" else 2)
+        return (count / (len(window) + len(terms)))**(2 if self.indexer.ranking.name == "VSM" else 1)
 
     def metrics(self, real, predicted):
 

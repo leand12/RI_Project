@@ -9,12 +9,23 @@
 
 ## Table of Contents <!-- omit in toc -->
 - [How it works](#how-it-works)
-- [Tokenizer](#tokenizer)
-- [Indexer](#indexer)
+  - [Tokenizer](#tokenizer)
+  - [Indexer](#indexer)
+  - [Ranking](#ranking)
+    - [VSM](#vsm)
+    - [BM25](#bm25)
 - [Results](#results)
+  - [Indexing](#indexing)
+  - [Ranking](#ranking-1)
+    - [VSM](#vsm-1)
+    - [BM25](#bm25-1)
+  - [Boost](#boost)
+    - [BM25 without Boost](#bm25-without-boost)
+    - [BM25 with Boost](#bm25-with-boost)
 - [How to run](#how-to-run)
-- [Indexer](#indexer-1)
-- [Tokenizer](#tokenizer-1)
+  - [Indexer](#indexer-1)
+  - [Tokenizer](#tokenizer-1)
+  - [Ranking](#ranking-2)
 
 
 
@@ -177,6 +188,44 @@ For the query `greatest rock album` when using the digital_video_games dataset w
 Using our tokenizer, the most relevant document has in total **115 terms**, where **5 terms** math the query. BM25 also has into consideration the length of the document, and when compared to the other ones above, for example, this one is much bigger. 
 
 In comparison, the least relevant (which, by coincidende, is the same in VSM rank) has only **1 term** in **17 terms** that matches the query. This is because it is a small document, which is penalized by the BM25 ranking.
+
+
+### Boost
+
+#### BM25 without Boost
+
+Query Throughput: 0.97 queries/second
+
+Query Execution Time: 1.03 seconds/query
+
+Total time taken to search for all queries: 15.44 seconds
+
+
+Metrics for all queries
+ | Top K  |  Precision |   Recall  |  F-Measure  |  Average Precision  |  NDCG|
+|-------  |----------- | --------  |-----------  |-------------------  |------|
+ |10  |      0.860 |    0.118  |      0.207  |              0.927  | 0.763|
+ |20  |      0.793 |    0.218  |      0.340  |              0.871  | 0.735|
+| 50  |      0.617 |    0.420  |      0.497  |              0.769  | 0.690|
+
+
+#### BM25 with Boost
+
+
+Query Throughput: 0.44 queries/second
+
+Query Execution Time: 2.29 seconds/query
+
+Total time taken to search for all queries: 34.38 seconds
+
+
+Metrics for all queries                                                   
+|  Top K |   Precision  |  Recall   | F-Measure   | Average Precision|    NDCG   |
+|------- | ----------- | -------- | ----------- | -------------------  |------   |
+| 10   |     0.947   |  0.130    |    0.229    |            0.970  | 0.843   |
+| 20   |     0.893   |  0.245    |    0.384    |            0.943  | 0.819   |
+| 50   |     0.680   |  0.460    |    0.546    |            0.844  | 0.760   |
+
 
 
 <!--
