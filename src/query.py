@@ -10,7 +10,7 @@ import time
 from tabulate import tabulate
 from utils import levenshtein
 import numpy as np
-from typing import List
+from typing import List, Union
 
 
 class Ranking:
@@ -54,7 +54,7 @@ class Query:
         self.indexer = indexer
         self.window_size = window
 
-    def search_file(self, filename):
+    def search_file(self, filename, boost=False):
 
         with open(filename, "r") as f:
             with open(f"./results.txt", "w") as q:
@@ -77,7 +77,7 @@ class Query:
                         q.write(f"{doc}\t{score:.6f}\n")
                     q.write("\n")
 
-    def search_file_with_accuracy(self, filename):
+    def search_file_with_accuracy(self, filename, boost=False):
 
         all_data = []
         header = ["Top K", "Precision", "Recall",
@@ -96,7 +96,7 @@ class Query:
                         temp = line.split()
                         docs.append((temp[0], int(temp[1])))
 
-                    data = self.metrics(docs, self.search(query, top=50))
+                    data = self.metrics(docs, self.search(query, boost, top=50))
                     all_data.append(data)
 
         total_time = time.perf_counter() - start
@@ -117,7 +117,7 @@ class Query:
         print(tabulate([header, *avg_data],
               headers="firstrow", floatfmt='.3f'))
 
-    def search(self, query, top=10):
+    def search(self, query, boost=False, top=10):
 
         terms = self.indexer.tokenizer.normalize_tokens(query.strip().split())
 
@@ -125,11 +125,11 @@ class Query:
             return None
 
         if self.indexer.ranking.name == "VSM":
-            return self.tf_idf_score(terms)[:top]
+            return self.tf_idf_score(terms, boost)[:top]
         elif self.indexer.ranking.name == "BM25":
-            return self.bm25_score(terms)[:top]
+            return self.bm25_score(terms, boost)[:top]
 
-    def tf_idf_score(self, terms: List[str]):
+    def tf_idf_score(self, terms: List[str], boost):
         """Sort and rank the documents according to VSM"""
 
         scores = {}
@@ -157,16 +157,17 @@ class Query:
                     scores.setdefault(doc, 0)
                     scores[doc] += float(weights[i]) * lt * cnt
 
-        if scores:
-            if self.indexer.ranking.p2[2] == 'c':
-                # normalization (cosine) **c
-                cos_norm = 1 / math.sqrt(cos_norm)
-                for doc in scores:
-                    scores[doc] *= cos_norm
-            scores = self.boost_query(terms, term_postings, scores)
-            return sorted(scores.items(), key=lambda x: -x[1])
+        if scores and self.indexer.ranking.p2[2] == 'c':
+            # normalization (cosine) **c
+            cos_norm = 1 / math.sqrt(cos_norm)
+            for doc in scores:
+                scores[doc] *= cos_norm
 
-    def bm25_score(self, terms: List[str]):
+        if boost:    
+            scores = self.boost_query(terms, term_postings, scores)
+        return sorted(scores.items(), key=lambda x: -x[1])
+
+    def bm25_score(self, terms: List[str], boost):
         """Sort and rank the documents according to BM25"""
 
         scores = {}
@@ -179,9 +180,10 @@ class Query:
                 for i, doc in enumerate(postings.keys()):
                     scores.setdefault(doc, 0)
                     scores[doc] += float(weights[i]) * cnt
-        if scores:
+
+        if boost:
             scores = self.boost_query(terms, term_postings, scores)
-            return sorted(scores.items(), key=lambda x: -x[1])
+        return sorted(scores.items(), key=lambda x: -x[1])
 
     def boost_query(self, terms: List[str], term_postings, scores):
 
@@ -222,17 +224,12 @@ class Query:
             score = 0.8 * boost / len(d_pos)**2
             scores[doc] += scores[doc] * score
 
-        # print('\n'.join(b[0] + '\t' + str(b[1]) for b in sorted(all_boost, key=lambda x: x[1])))
-        # print('\n'*4)
         return scores
 
-    def __evaluate_window(self, terms, window):
+    def __evaluate_window(self, terms: List[str], window: List[Union[str, None]]):
 
-        # n de termos na query
-        count = len(set(x for x in window if x))  # windowsize
-        # count += 0.1 * (sum(1 for x in window if x) - count + 1)
+        count = len(set(x for x in window if x))
         count += len(terms) - levenshtein(terms, window)
-
         return (count / (len(window) + len(terms)))**(1 if self.indexer.ranking.name == "VSM" else 2)
 
     def metrics(self, real, predicted):

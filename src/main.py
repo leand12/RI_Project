@@ -46,8 +46,11 @@ def search_indexer(args):
 
     query = Query(indexer)
 
-    if args.query:
-        query.search_file_with_accuracy(args.query)
+    if args.test:
+        query.search_file_with_accuracy("queries.relevance.txt", args.boost)
+
+    elif args.query:
+        query.search_file(args.query, args.boost)
 
     else:
         while True:
@@ -59,7 +62,7 @@ def search_indexer(args):
                 break
 
             start = time.perf_counter()
-            results = query.search(search)
+            results = query.search(search, args.boost)
 
             if results:
                 logging.info(
@@ -134,10 +137,13 @@ if __name__ == "__main__":
                                     help='search in an indexer already created')
     i_parser.add_argument('search', metavar='DIR',
                           help='source directory of an indexer')
-    i_parser.add_argument('-q', '--query', metavar='FILE',
+    i_parser.add_argument('-b', '--boost', action='store_true',
+                          help='boost query results with a function that ranks according to document windows')
+    i_group = i_parser.add_mutually_exclusive_group()
+    i_group.add_argument('-q', '--query', metavar='FILE',
                           help='text file with multiple queries separated by a new line')
-    # i_parser.add_argument('-a', '--query', metavar='FILE',
-    #                       help='text file with multiple queries separated by a new line')
+    i_group.add_argument('-t', '--test', action='store_true',
+                          help='test results accuracy comparing with scores from \"queries.relevance.txt\"')
 
     args = parser.parse_args()
 
