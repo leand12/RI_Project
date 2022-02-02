@@ -44,13 +44,13 @@ def search_indexer(args):
     logging.info(
         f"Time taken to start up index: {time.perf_counter() - start:.2f} seconds")
 
-    query = Query(indexer)
+    query = Query(indexer, args.boost)
 
     if args.test:
-        query.search_file_with_accuracy("queries.relevance.txt", args.boost)
+        query.search_file_with_accuracy("queries.relevance.txt")
 
     elif args.query:
-        query.search_file(args.query, args.boost)
+        query.search_file(args.query)
 
     else:
         while True:
@@ -62,7 +62,7 @@ def search_indexer(args):
                 break
 
             start = time.perf_counter()
-            results = query.search(search, args.boost)
+            results = query.search(search)
 
             if results:
                 logging.info(
@@ -137,13 +137,14 @@ if __name__ == "__main__":
                                     help='search in an indexer already created')
     i_parser.add_argument('search', metavar='DIR',
                           help='source directory of an indexer')
-    i_parser.add_argument('-b', '--boost', action='store_true',
-                          help='boost query results with a function that ranks according to document windows')
+    i_parser.add_argument('-b', '--boost', metavar='WINDOW', type=int, nargs='?', default=0, const=5,
+                          help='boost query results with a function that ranks according to document windows of '
+                          'size WINDOW (const: %(const)s, default: %(default)s)')
     i_group = i_parser.add_mutually_exclusive_group()
     i_group.add_argument('-q', '--query', metavar='FILE',
-                          help='text file with multiple queries separated by a new line')
+                         help='text file with multiple queries separated by a new line')
     i_group.add_argument('-t', '--test', action='store_true',
-                          help='test results accuracy comparing with scores from \"queries.relevance.txt\"')
+                         help='test results accuracy comparing with scores from \"queries.relevance.txt\"')
 
     args = parser.parse_args()
 

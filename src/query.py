@@ -50,11 +50,11 @@ class BM25(Ranking):
 
 class Query:
 
-    def __init__(self, indexer, window=5):
+    def __init__(self, indexer, boost_window=0):
         self.indexer = indexer
-        self.window_size = window
+        self.boost_window = boost_window
 
-    def search_file(self, filename, boost=False):
+    def search_file(self, filename):
 
         with open(filename, "r") as f:
             with open(f"./results.txt", "w") as q:
@@ -77,7 +77,7 @@ class Query:
                         q.write(f"{doc}\t{score:.6f}\n")
                     q.write("\n")
 
-    def search_file_with_accuracy(self, filename, boost=False):
+    def search_file_with_accuracy(self, filename):
 
         all_data = []
         header = ["Top K", "Precision", "Recall",
@@ -96,7 +96,7 @@ class Query:
                         temp = line.split()
                         docs.append((temp[0], int(temp[1])))
 
-                    data = self.metrics(docs, self.search(query, boost, top=50))
+                    data = self.metrics(docs, self.search(query, top=50))
                     all_data.append(data)
 
         total_time = time.perf_counter() - start
@@ -117,7 +117,7 @@ class Query:
         print(tabulate([header, *avg_data],
               headers="firstrow", floatfmt='.3f'))
 
-    def search(self, query, boost=False, top=10):
+    def search(self, query, top=10):
 
         terms = self.indexer.tokenizer.normalize_tokens(query.strip().split())
 
@@ -125,11 +125,11 @@ class Query:
             return None
 
         if self.indexer.ranking.name == "VSM":
-            return self.tf_idf_score(terms, boost)[:top]
+            return self.tf_idf_score(terms)[:top]
         elif self.indexer.ranking.name == "BM25":
-            return self.bm25_score(terms, boost)[:top]
+            return self.bm25_score(terms)[:top]
 
-    def tf_idf_score(self, terms: List[str], boost):
+    def tf_idf_score(self, terms: List[str]):
         """Sort and rank the documents according to VSM"""
 
         scores = {}
@@ -163,11 +163,11 @@ class Query:
             for doc in scores:
                 scores[doc] *= cos_norm
 
-        if boost:    
+        if self.boost_window:    
             scores = self.boost_query(terms, term_postings, scores)
         return sorted(scores.items(), key=lambda x: -x[1])
 
-    def bm25_score(self, terms: List[str], boost):
+    def bm25_score(self, terms: List[str]):
         """Sort and rank the documents according to BM25"""
 
         scores = {}
@@ -181,7 +181,7 @@ class Query:
                     scores.setdefault(doc, 0)
                     scores[doc] += float(weights[i]) * cnt
 
-        if boost:
+        if self.boost_window:
             scores = self.boost_query(terms, term_postings, scores)
         return sorted(scores.items(), key=lambda x: -x[1])
 
@@ -203,12 +203,12 @@ class Query:
             boost = 0
             # slide window so that it starts on query token
             for i in range(len(d_pos)):
-                window = [None] * self.window_size
+                window = [None] * self.boost_window
                 window[0] = d_pos[i][0]
 
                 tempi = i
                 start = d_pos[i][1]
-                while i + 1 < len(d_pos) and d_pos[i + 1][1] - start < self.window_size:
+                while i + 1 < len(d_pos) and d_pos[i + 1][1] - start < self.boost_window:
                     window[d_pos[i + 1][1] - start] = d_pos[i + 1][0]
                     i += 1
 
