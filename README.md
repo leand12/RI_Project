@@ -190,7 +190,7 @@ Using our tokenizer, the most relevant document has in total **115 terms**, wher
 In comparison, the least relevant (which, by coincidende, is the same in VSM rank) has only **1 term** in **17 terms** that matches the query. This is because it is a small document, which is penalized by the BM25 ranking.
 
 
-### Boost
+### Ranking Accuracy
 
 #### BM25 without Boost
 
@@ -226,6 +226,40 @@ Metrics for all queries
 | 20   |     0.893   |  0.245    |    0.384    |            0.943  | 0.819   |
 | 50   |     0.680   |  0.460    |    0.546    |            0.844  | 0.760   |
 
+
+#### VSM without Boost
+
+Query Throughput: 1.01 queries/second
+
+Query Execution Time: 0.99 seconds/query
+
+Total time taken to search for all queries: 14.86 seconds
+
+
+Metrics for all queries
+ | Top K  |  Precision |   Recall  |  F-Measure  |  Average Precision  |  NDCG|
+|-------  |----------- | --------  |-----------  |-------------------  |------|
+ |10  |      0.993 |    0.138  |      0.241  |              0.999  | 0.880|
+ |20  |      0.983 |    0.273  |      0.426  |              0.991  | 0.885|
+| 50  |      0.877 |    0.605  |      0.712  |              0.957  | 0.876|
+
+
+#### VSM with Boost
+
+
+Query Throughput: 0.45 queries/second
+
+Query Execution Time: 2.23 seconds/query
+
+Total time taken to search for all queries: 33.45 seconds
+
+
+Metrics for all queries                                                   
+|  Top K |   Precision  |  Recall   | F-Measure   | Average Precision|    NDCG   |
+|------- | ----------- | -------- | ----------- | -------------------  |------   |
+| 10   |     0.987   |  0.137    |    0.240    |            0.993  | 0.869   |
+| 20   |     0.957   |  0.264    |    0.413    |            0.985  | 0.862   |
+| 50   |     0.813   |  0.559    |    0.659    |            0.923  | 0.843   |
 
 
 <!--
